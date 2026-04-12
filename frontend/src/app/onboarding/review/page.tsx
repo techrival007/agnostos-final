@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle, Edit3, Save, ArrowRight, Loader2 } from "lucide-react";
+import { CheckCircle, Save, Loader2 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { useAuthStore } from "@/stores/useAuthStore";
 import type { InterviewTranscript, InterviewQA } from "@/types";
@@ -9,9 +9,9 @@ import type { InterviewTranscript, InterviewQA } from "@/types";
 export default function ReviewPage() {
   const [transcript, setTranscript] = useState<InterviewTranscript | null>(null);
   const [qaList, setQaList] = useState<InterviewQA[]>([]);
-  const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
@@ -40,18 +40,18 @@ export default function ReviewPage() {
         method: "PATCH",
         body: JSON.stringify({ analyzed_qa: qaList }),
       });
+      setDirty(false);
     } catch (err: any) {
       setError(err.message);
     } finally {
       setSaving(false);
-      setEditingIdx(null);
     }
   };
 
   const handleComplete = async () => {
     setCompleting(true);
     try {
-      if (editingIdx !== null) await handleSave();
+      if (dirty) await handleSave();
       await apiFetch("/api/adam/onboarding/step", { method: "PATCH" });
       await loadUser();
       router.push("/");
@@ -86,41 +86,33 @@ export default function ReviewPage() {
       ) : (
         <div className="space-y-4">
           {qaList.map((qa, idx) => (
-            <div key={idx} className="card-zen rounded-2xl p-6">
-              <div className="flex items-start justify-between mb-3">
-                <h3 className="text-sm font-medium text-[var(--primary)]">{qa.question}</h3>
-                <button
-                  onClick={() => setEditingIdx(editingIdx === idx ? null : idx)}
-                  className="p-1.5 rounded-lg hover:bg-white/10 text-[var(--text-muted)]"
-                >
-                  <Edit3 className="w-4 h-4" />
-                </button>
-              </div>
-
-              {editingIdx === idx ? (
-                <div className="space-y-3">
-                  <textarea
-                    value={qa.answer}
-                    onChange={(e) => {
-                      const updated = [...qaList];
-                      updated[idx] = { ...qa, answer: e.target.value };
-                      setQaList(updated);
-                    }}
-                    rows={4}
-                    className="w-full px-4 py-3 rounded-xl bg-white/5 border border-[var(--border)] text-white placeholder:text-neutral-600 focus:border-[var(--primary)]/30 transition-all resize-none"
-                  />
-                  <button onClick={handleSave} disabled={saving}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--primary)]/20 text-[var(--primary)] text-sm hover:bg-[var(--primary)]/30 disabled:opacity-50">
-                    {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
-                    Save
-                  </button>
-                </div>
-              ) : (
-                <p className="text-sm text-[var(--text-muted)] leading-relaxed">{qa.answer}</p>
-              )}
+            <div key={idx} className="card-zen rounded-2xl p-6 space-y-3">
+              <input
+                value={qa.question}
+                onChange={(e) => {
+                  const updated = [...qaList];
+                  updated[idx] = { ...qa, question: e.target.value };
+                  setQaList(updated);
+                  setDirty(true);
+                }}
+                className="w-full text-sm font-medium text-[var(--primary)] bg-transparent border-b border-[var(--border)] pb-1.5 focus:border-[var(--primary)]/40 outline-none transition-colors placeholder:text-neutral-600"
+                placeholder="Question"
+              />
+              <textarea
+                value={qa.answer}
+                onChange={(e) => {
+                  const updated = [...qaList];
+                  updated[idx] = { ...qa, answer: e.target.value };
+                  setQaList(updated);
+                  setDirty(true);
+                }}
+                rows={3}
+                className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-[var(--border)] text-sm text-white placeholder:text-neutral-600 focus:border-[var(--primary)]/30 transition-all resize-none leading-relaxed"
+                placeholder="Answer"
+              />
 
               {qa.key_insights?.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-3">
+                <div className="flex flex-wrap gap-2">
                   {qa.key_insights.map((insight, j) => (
                     <span key={j} className="px-2 py-1 rounded-md bg-[var(--primary)]/10 text-[var(--primary)] text-xs">
                       {insight}
@@ -139,7 +131,16 @@ export default function ReviewPage() {
         </div>
       )}
 
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-3">
+        {dirty && (
+          <button
+            onClick={handleSave} disabled={saving}
+            className="flex items-center gap-2 px-5 py-3 rounded-xl bg-white/5 border border-[var(--border)] text-[var(--text-muted)] font-medium hover:bg-white/10 transition-colors disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            Save Changes
+          </button>
+        )}
         <button
           onClick={handleComplete} disabled={completing}
           className="flex items-center gap-2 px-6 py-3 rounded-xl bg-[var(--primary)] text-white font-medium hover:opacity-90 transition-opacity disabled:opacity-50"

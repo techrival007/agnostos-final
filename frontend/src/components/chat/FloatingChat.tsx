@@ -13,6 +13,7 @@ export function FloatingChat() {
   const [sending, setSending] = useState(false);
   const [showSessions, setShowSessions] = useState(false);
   const [loadingSessions, setLoadingSessions] = useState(false);
+  const [creating, setCreating] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -32,7 +33,9 @@ export function FloatingChat() {
         setActiveSession(data[0].id);
         loadMessages(data[0].id);
       }
-    } catch {} finally {
+    } catch (err) {
+      console.error("[FloatingChat] Failed to load sessions:", err);
+    } finally {
       setLoadingSessions(false);
     }
   };
@@ -41,10 +44,14 @@ export function FloatingChat() {
     try {
       const data = await apiFetch<ChatMessage[]>(`/api/chat/sessions/${sessionId}/messages`);
       setMessages(data);
-    } catch {}
+    } catch (err) {
+      console.error("[FloatingChat] Failed to load messages:", err);
+    }
   };
 
   const createSession = async () => {
+    if (creating) return;
+    setCreating(true);
     try {
       const session = await apiFetch<ChatSession>("/api/chat/sessions", {
         method: "POST",
@@ -54,7 +61,11 @@ export function FloatingChat() {
       setActiveSession(session.id);
       setMessages([]);
       setShowSessions(false);
-    } catch {}
+    } catch (err) {
+      console.error("[FloatingChat] Failed to create session:", err);
+    } finally {
+      setCreating(false);
+    }
   };
 
   const deleteSession = async (id: string) => {
@@ -65,7 +76,9 @@ export function FloatingChat() {
         setActiveSession(null);
         setMessages([]);
       }
-    } catch {}
+    } catch (err) {
+      console.error("[FloatingChat] Failed to delete session:", err);
+    }
   };
 
   const switchSession = (id: string) => {
@@ -92,7 +105,8 @@ export function FloatingChat() {
         const filtered = prev.filter((m) => m.id !== "temp");
         return [...filtered, res.user_message, res.adam_reply];
       });
-    } catch {
+    } catch (err) {
+      console.error("[FloatingChat] Failed to send message:", err);
       setMessages((prev) => prev.filter((m) => m.id !== "temp"));
     } finally {
       setSending(false);
@@ -127,8 +141,12 @@ export function FloatingChat() {
           <button onClick={() => setShowSessions(!showSessions)} className="p-1.5 rounded-lg hover:bg-white/10 text-[var(--text-muted)]">
             <MessageCircle className="w-4 h-4" />
           </button>
-          <button onClick={createSession} className="p-1.5 rounded-lg hover:bg-white/10 text-[var(--text-muted)]">
-            <Plus className="w-4 h-4" />
+          <button
+            onClick={createSession}
+            disabled={creating}
+            className="p-1.5 rounded-lg hover:bg-white/10 text-[var(--text-muted)] disabled:opacity-50"
+          >
+            {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
           </button>
           <button onClick={() => setOpen(false)} className="p-1.5 rounded-lg hover:bg-white/10 text-[var(--text-muted)]">
             <X className="w-4 h-4" />
@@ -145,9 +163,9 @@ export function FloatingChat() {
           ) : sessions.length === 0 ? (
             <div className="text-center py-8 text-[var(--text-muted)] text-sm">
               <p className="mb-3">No conversations yet</p>
-              <button onClick={createSession}
-                className="px-4 py-2 rounded-lg bg-[var(--primary)]/20 text-[var(--primary)] text-sm">
-                Start a Chat
+              <button onClick={createSession} disabled={creating}
+                className="px-4 py-2 rounded-lg bg-[var(--primary)]/20 text-[var(--primary)] text-sm disabled:opacity-50">
+                {creating ? "Creating…" : "Start a Chat"}
               </button>
             </div>
           ) : (
@@ -177,15 +195,20 @@ export function FloatingChat() {
           <div>
             <MessageCircle className="w-10 h-10 mx-auto mb-3 text-[var(--text-muted)]" />
             <p className="text-sm text-[var(--text-muted)] mb-4">Start a conversation with Adam</p>
-            <button onClick={createSession}
-              className="px-4 py-2 rounded-lg bg-[var(--primary)] text-white text-sm hover:opacity-90">
-              New Chat
+            <button onClick={createSession} disabled={creating}
+              className="px-4 py-2 rounded-lg bg-[var(--primary)] text-white text-sm hover:opacity-90 disabled:opacity-50">
+              {creating ? "Creating…" : "New Chat"}
             </button>
           </div>
         </div>
       ) : (
         <>
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {messages.length === 0 && !sending && (
+              <p className="text-sm text-[var(--text-muted)] text-center py-8">
+                Send a message to start chatting
+              </p>
+            )}
             {messages.map((msg) => (
               <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div className={`max-w-[85%] px-3 py-2 rounded-xl text-sm ${

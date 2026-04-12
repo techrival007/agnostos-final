@@ -108,10 +108,6 @@ export function Sidebar() {
       </nav>
 
       <div className="w-full space-y-1">
-        <div className="flex items-center gap-3 px-4 py-3 rounded-2xl text-[var(--text-muted)] border border-white/5 bg-white/[0.02]">
-          <Zap className="w-5 h-5 shrink-0 text-amber-400" />
-          <span className="hidden lg:block text-sm font-medium">100 tokens</span>
-        </div>
         <button
           type="button"
           onClick={handleLogout}

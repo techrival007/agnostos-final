@@ -1,7 +1,7 @@
 "use client";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Mic, MicOff, ArrowRight, Loader2, Clock, AlertCircle } from "lucide-react";
+import { Mic, MicOff, ArrowRight, Loader2, Clock, AlertCircle, Square } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -233,6 +233,15 @@ export default function InterviewPage() {
     }
   };
 
+  const endEarly = async () => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: "end_interview" }));
+    }
+    releaseMic();
+    wsRef.current?.close();
+    await handleComplete();
+  };
+
   const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
   const progress = totalQuestions > 0 ? Math.min(questionNum / totalQuestions, 1) : 0;
 
@@ -254,6 +263,18 @@ export default function InterviewPage() {
             </div>
             <span className="text-[var(--border)]">|</span>
             <span>{questionNum}/{totalQuestions}</span>
+            {status !== "complete" && (
+              <>
+                <span className="text-[var(--border)]">|</span>
+                <button
+                  onClick={endEarly}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
+                >
+                  <Square className="w-3 h-3" />
+                  End Interview
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>

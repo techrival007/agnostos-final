@@ -545,6 +545,46 @@ async def get_interview_transcript(
     )
 
 
+@router.post("/suggest-preferences")
+async def suggest_preferences(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(UserProfile).where(UserProfile.user_id == user.id)
+    )
+    profile = result.scalar_one_or_none()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    skills = profile.parsed_skills or {}
+    experience = profile.parsed_experience or []
+    projects = profile.parsed_projects or []
+
+    prompt = f"""Based on this person's professional profile, suggest job search preferences.
+
+Skills: {json.dumps(skills)}
+Experience (last 3): {json.dumps(experience[:3])}
+Projects (last 3): {json.dumps(projects[:3])}
+
+Return a JSON object with exactly these keys:
+- "roles": list of 5-8 specific job titles they'd be a strong fit for
+- "stages": list of company stages from ONLY these options: ["Seed", "Series A", "Series B", "Series C+", "Growth / Public", "Bootstrapped"]
+- "sectors": list of 4-6 industry sectors that match their background
+
+Only return valid JSON, no markdown fences, no extra text."""
+
+    try:
+        suggestions = await generate_structured(prompt)
+        return suggestions
+    except Exception:
+        return {
+            "roles": ["Software Engineer", "Full Stack Developer", "Backend Engineer"],
+            "stages": ["Seed", "Series A", "Series B"],
+            "sectors": ["SaaS", "FinTech", "Developer Tools"],
+        }
+
+
 @router.patch("/interview/answers")
 async def update_interview_answers(
     req: InterviewAnswerUpdate,
