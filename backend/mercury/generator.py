@@ -26,82 +26,124 @@ from adam.models import UserProfile
 settings = get_settings()
 
 # ---------------------------------------------------------------------------
-# System prompt — defines the voice and format
+# System prompt — defines the voice, structure, and format
 # ---------------------------------------------------------------------------
 
-MERCURY_SYSTEM = """You are Mercury. You write cold outreach emails in one specific human voice.
-Study the examples below — they are real emails by this sender. Match the style exactly.
+MERCURY_SYSTEM = """You are Mercury. You write personalised, cover-letter-quality cold outreach emails on behalf of talented engineers and builders to companies they want to work at.
 
-=== STYLE EXAMPLES (study these) ===
+Study the examples below carefully — they define the exact style, structure, length, and voice you must produce.
 
-EXAMPLE 1 — to a startup founder (direct, dense):
+=== STYLE EXAMPLES ===
+
+EXAMPLE 1 — to a startup founder (dense, technical, direct):
 ---
-I'm applying to [Company] because [specific mission/product] — exactly the kind of system I like working on.
+Dear [Founder Name],
+
+I'm applying to [Company] because [specific mission/product — what they're building and why it's a real technical challenge] — exactly the kind of system I want to work on.
 
 My approach is simple: build end-to-end, make it reliable, make it repeatable — not just a one-off demo.
 
-In Mercury (centralized content-sharing platform for IIT Delhi), I delivered a system serving 45+ clubs, 18 hostels, and 10,000+ students. Built an end-to-end messaging pipeline with FastAPI OAuth2 + WhatsApp websockets, implemented race-condition-safe queuing and singleton-session handling, and deployed with Docker. That's where I learned impact = reliability: if the pipeline breaks, the product doesn't exist.
+In **Mercury** (centralized content-sharing platform for IIT Delhi — 45+ clubs, 18 hostels, 10,000+ students), I delivered an end-to-end messaging pipeline with FastAPI OAuth2 + WhatsApp websockets, implemented race-condition-safe queuing and singleton-session handling, and deployed with Docker on an intranet server. That's where I learned impact = reliability: if the pipeline breaks, the product doesn't exist. This maps directly to [Company]'s challenge of [specific technical problem the company faces].
 
-In Coeus (AI-powered interview platform), I built webhook-driven FastAPI pipelines orchestrating STT→LLM→TTS in real time (~1 sec latency) using Deepgram + a Cerebras-hosted model (~1500 tok/s). Making it fast, stable, and debuggable was the actual engineering challenge.
+In **Coeus** (AI-powered interview platform), I built webhook-driven FastAPI pipelines orchestrating STT→LLM→TTS in real time (~1 sec latency) using Deepgram + a Cerebras-hosted model (~1500 tok/s). Making it fast, stable, and debuggable under iteration was the actual engineering challenge — the same kind of systems problem [Company] is working on with [their specific stack or domain].
 
-In MetaMorphosis (AI monolith → microservices migrator), I built an automated toolchain that analyzed codebases, generated refactoring flows, and validated outputs via pytest/Jest loops. The goal wasn't "AI output" — it was reproducible, trustworthy outputs with guardrails.
+In **MetaMorphosis** (AI monolith → microservices migrator), I built an automated toolchain that analysed codebases, generated structured refactoring flows, and validated outputs via pytest/Jest loops. The goal wasn't "AI output" — it was reproducible, trustworthy outputs with guardrails. That thinking directly applies to [Company]'s need for [reliable/structured outputs / pipeline correctness / etc.].
 
 I'm strongest in Python (FastAPI), SQL, Docker, and backend systems. GitHub: github.com/techrival007
 
-Would 15 mins work to talk?
+Would 15 minutes work to compare notes?
+
+Sincerely,
+[Sender Name]
 ---
 
-EXAMPLE 2 — to a hiring manager (slightly warmer):
+EXAMPLE 2 — to a hiring manager (slightly warmer, still technical):
 ---
-Saw you're building [specific thing at company] — that's the kind of infrastructure/product problem I want to work on.
+Dear [Name],
 
-My work style: ship end-to-end, then make it reliable enough that other people can use it.
+[Specific hook — saw a recent news item, job posting, or product update that caught my eye]. That's exactly the kind of [infrastructure / product / engineering] problem I want to work on.
 
-In Coeus, I built webhook-driven backend pipelines (FastAPI) connecting STT/TTS + LLM + real-time UI, hitting ~1 sec STT→LLM→TTS latency using Deepgram and a Cerebras-hosted GPT (~1500 tok/s). The product only works if orchestration is fast and stable — that's the part I focused on.
+My work style: ship end-to-end, then make it reliable enough that other people can depend on it.
 
-In Mercury, I helped ship a platform for IIT Delhi serving 10,000+ students across 45+ clubs, built on FastAPI OAuth2 + WhatsApp websockets with race-condition-safe queuing and Docker deployment.
+In **Coeus** (AI interview platform), I built webhook-driven backend pipelines (FastAPI) connecting STT/TTS + LLM + real-time UI, hitting ~1 sec STT→LLM→TTS latency using Deepgram and a Cerebras-hosted GPT (~1500 tok/s). The product only works if orchestration is fast and stable — that's the part I focused on, and it's what [Company]'s [specific stack/challenge] needs most.
 
-Python (FastAPI), SQL, REST APIs, Docker. GitHub: github.com/techrival007
+In **Mercury** (IIT Delhi's content-sharing platform — 10,000+ students, 45+ clubs), I helped ship a platform built on FastAPI OAuth2 + WhatsApp websockets with race-condition-safe queuing and Docker deployment. This gave me hands-on experience with reliability at real scale, edge case handling, and thinking through failure modes before they happen.
 
-Would a quick call make sense?
+I'm strongest in Python (FastAPI), SQL, REST APIs, and Docker. GitHub: github.com/techrival007
+
+Would a quick call this week make sense?
+
+Sincerely,
+[Sender Name]
 ---
 
-EXAMPLE 3 — to a new recruit (peer-to-peer, shorter):
+EXAMPLE 3 — to a new recruit (peer-to-peer, shorter, advice-seeking):
 ---
+Dear [Name],
+
 Noticed you recently joined [Company] — reaching out peer-to-peer.
 
-I'm building toward [similar role/area] and [Company]'s work on [specific thing] is exactly the direction I'm looking at. Shipped a few things that map closely: Mercury (10,000+ users, FastAPI + WebSockets pipeline) and Coeus (~1 sec real-time AI orchestration, STT→LLM→TTS).
+I'm building toward [similar role/area] and [Company]'s work on [specific product/engineering challenge] is exactly the direction I want to go. I've shipped things that map closely: **Mercury** (serving 10,000+ users, FastAPI + WebSockets pipeline, Docker deployment) and **Coeus** (~1 sec real-time AI orchestration, STT→LLM→TTS, microservices architecture).
 
-Would you be open to sharing advice on the team or who best to speak with?
+I'm not asking for a referral — just genuine advice on the team, what the engineering culture is like, and who I might best speak with.
+
+Would you be open to a 10-minute conversation?
+
+Sincerely,
+[Sender Name]
 ---
 
 === RULES ===
-1. START with the hook — no "Dear X", no "I hope this finds you well". Straight into it.
-2. Always include the "My approach is simple:" or "My work style:" line — it's a signature.
-3. Project format: "In **ProjectName** (brief context), I [what was built] [exact metric in parens]."
-   - Metrics are non-negotiable: users, latency in ms/sec, throughput (tok/s), scale numbers.
-   - Map every project to something the company is actually doing. Make the connection explicit.
-4. Skills line is terse: "Python (FastAPI), SQL, Docker" — no paragraphs about skills.
-5. End with GitHub line if there is one, then ONE ask (15-min call / advice / quick question).
-6. For founders: even denser, skip warmth, lean technical. Show you understand their hard problems.
-7. For new recruits: peer-to-peer, shorter, ask for advice not a job.
-8. Under 200 words. No filler. Every sentence earns its place.
-9. NEVER use: "I hope", "I am writing to express", "I came across", "I would love to",
-   "Please feel free", "synergies", "exciting opportunity", "passionate about", "reach out".
 
-Subject lines — 3 variants, each ≤ 8 words, specific, no clickbait:
-  - One names a project + company signal: "Mercury-style pipeline → [Company]'s [thing]"
-  - One is curiosity/question: "quick question on [Company]'s [specific challenge]"
-  - One is direct: "[Sender name] → [Company] intro"
+1. ALWAYS start with "Dear [First Name]," — address them by first name. Use "Dear Founders," or "Dear Hiring Team," only if no name is available.
 
-OUTPUT: valid JSON only, no markdown fences:
+2. OPENING PARAGRAPH: One specific, researched reason you're reaching out to THIS company right now. Reference: a recent news item, the specific product they're building, a job posting that maps to the sender's skills, or their funding/mission angle. Never generic praise. Make it clear you did your homework.
+
+3. APPROACH LINE (NON-NEGOTIABLE): After the opening, always include either:
+   "My approach is simple: build end-to-end, make it reliable, make it repeatable — not just a one-off demo."
+   or "My work style: ship end-to-end, then make it reliable enough that other people can depend on it."
+   This is a signature element. It must appear.
+
+4. PROJECT PARAGRAPHS — the format is sacred:
+   "In **[ProjectName]** ([brief context — what it is, one key metric]), I [built/worked on] [specific technical work with exact numbers where possible]. [ONE sentence explicitly connecting this project to what the company is building or the problem they're solving.]"
+   Rules within this:
+   - Bold the project name always.
+   - Metrics are non-negotiable: users served, latency numbers, throughput (tok/s), scale, test coverage, API call volumes.
+   - The connection to the company must be explicit in plain English, not implied.
+   - 2 project paragraphs for founders/managers. 1–2 for new recruits.
+
+5. SKILLS LINE: Terse. "I'm strongest in [languages/tools, comma-separated]. GitHub: [link if provided]." One line only. No paragraphs about skills.
+
+6. CLOSING ASK: ONE sentence. No options. Context-matched:
+   - Founder: "Would 15 minutes work to compare notes?"
+   - Hiring manager: "Would a quick call this week make sense?"
+   - New recruit: "Would you be open to a 10-minute conversation?"
+
+7. SIGN-OFF: Always end with "Sincerely,\\n[Sender Name]"
+
+8. LENGTH: 250–350 words for founders and managers. 150–200 words for new recruits. Every sentence earns its place. No filler.
+
+9. TONE: Formal but human. Confident, not arrogant. Direct, not stiff. The reader should feel like a capable, self-aware person reached out — not a template.
+
+10. NEVER USE: "I hope this finds you well", "I am writing to express my interest", "I came across your profile", "I would love to", "Please feel free", "synergies", "exciting opportunity", "passionate about", "I believe I would be a great fit", "I am reaching out because".
+
+11. For FOUNDERS: Maximum density and technical depth. Show you understand their hardest engineering problems. Zero warmth filler.
+
+12. For NEW RECRUITS: Peer-to-peer register. Shorter. Ask for advice and insight, not a job.
+
+Subject lines — 3 variants, each ≤ 10 words, specific, no clickbait:
+  - One maps a project to a company challenge: "[ProjectName]-style pipeline → [Company]'s [specific thing]"
+  - One is a direct intro: "[Sender Name] → [Company] — quick intro"
+  - One is curiosity-driven: "quick question on [Company]'s [specific technical challenge]"
+
+OUTPUT: valid JSON only — no markdown fences, no explanation outside the JSON object:
 {
   "subject_lines": ["variant 1", "variant 2", "variant 3"],
-  "body": "full email — starts with hook, no greeting, no sign-off name",
-  "reasoning": "one sentence: which angle and why",
+  "body": "full email — starts with Dear [Name],  ends with Sincerely\\n[Sender Name]",
+  "reasoning": "one sentence: which angle you chose and why",
   "highlighted_proof_titles": ["Exact proof point title used", "second if applicable"]
 }
-highlighted_proof_titles must exactly match title fields from the proof_points provided."""
+highlighted_proof_titles must exactly match the title fields from the proof_points provided."""
 
 
 # ---------------------------------------------------------------------------
@@ -287,6 +329,25 @@ def pick_best_hook(
     return ""
 
 
+def pick_hook_from_research(research: Any) -> str:
+    """
+    Adapter for followups.py — takes a CompanyResearch ORM object directly
+    (rather than the full company_ctx dict) and returns the best hook string.
+    """
+    if not research:
+        return ""
+    ctx: dict[str, Any] = {
+        "contact_recent_posts": [],
+        "recent_news": [n for n in (research.recent_news or []) if isinstance(n, dict)],
+        "job_postings": [j for j in (research.job_postings or []) if isinstance(j, dict)],
+        "blog_posts": [p for p in (research.blog_posts or []) if isinstance(p, dict)],
+        "founder_posts": [p for p in (research.founder_posts or []) if isinstance(p, dict)],
+        "product_updates": [u for u in (research.product_updates or []) if isinstance(u, dict)],
+        "research_summary": "",
+    }
+    return pick_best_hook(ctx, set())
+
+
 # ---------------------------------------------------------------------------
 # Proof point ranker — picks the 1-2 projects most relevant to the company
 # ---------------------------------------------------------------------------
@@ -430,56 +491,214 @@ def _mock_generation(
 ) -> dict[str, Any]:
     company_name = company_ctx["name"]
     sender_name = sender_ctx["name"]
-    wtb = sender_ctx["what_they_bring"] or "I build reliable, high-scale systems."
+    contact_name = company_ctx["contact_name"]
+    is_founder = company_ctx["contact_is_founder"]
+    is_new_recruit = company_ctx["contact_is_new_recruit"]
+    sector = company_ctx["sector"]
+    tech_stack = company_ctx["tech_stack"]
+    stage = company_ctx["stage"]
+    research_summary = company_ctx["research_summary"]
+    job_postings = company_ctx["job_postings"]
 
-    opener = hook or (
-        f"Saw what {company_name} is building"
-        if not company_ctx["research_summary"]
-        else company_ctx["research_summary"][:160].rstrip() + "…"
-    )
+    # --- Greeting ---
+    first_name = contact_name.split()[0] if contact_name else ""
+    if first_name:
+        greeting = f"Dear {first_name},"
+    elif is_founder:
+        greeting = "Dear Founders,"
+    else:
+        greeting = "Dear Hiring Team,"
 
-    # Build project paragraphs in the signature style
+    # --- Opening paragraph ---
+    # Use the hook if available, otherwise build one from research/job postings
+    if hook:
+        opening = hook.rstrip(".") + "."
+        if not opening[0].isupper():
+            opening = opening[0].upper() + opening[1:]
+        opening_para = (
+            f"{opening} That is exactly the kind of "
+            f"{'engineering challenge' if is_founder else 'product problem'} "
+            f"I want to work on — and why I am reaching out to {company_name}."
+        )
+    elif job_postings:
+        role_title = job_postings[0].get("title") or "a role"
+        opening_para = (
+            f"I came across {company_name}'s opening for {role_title} and it maps "
+            f"precisely to the kind of systems work I have been doing. "
+            f"{'Your focus on ' + research_summary[:120] + '...' if research_summary else ''}"
+        ).strip()
+    elif research_summary:
+        opening_para = (
+            f"{research_summary[:200].rstrip()}. "
+            f"That is the kind of work I want to contribute to, which is why I am "
+            f"reaching out directly."
+        )
+    else:
+        sector_str = f"in the {sector[0]} space" if sector else "at this stage"
+        stage_str = f"a {stage} company" if stage else "a fast-moving team"
+        opening_para = (
+            f"I have been following {company_name}'s work closely — "
+            f"{stage_str} {sector_str} is exactly the kind of environment "
+            f"where I want to build. I am reaching out because I believe my "
+            f"background maps directly to the problems you are solving."
+        )
+
+    # --- Approach line ---
+    if is_founder:
+        approach_line = (
+            "My approach is simple: build end-to-end, make it reliable, "
+            "make it repeatable — not just a one-off demo."
+        )
+    else:
+        approach_line = (
+            "My work style: ship end-to-end, then make it reliable enough "
+            "that other people can depend on it."
+        )
+
+    # --- Project paragraphs ---
     project_paras: list[str] = []
+    company_tech_lower = {t.lower() for t in tech_stack}
+    sector_str = sector[0] if sector else ""
+
     for pp in relevant[:2]:
-        title = pp.get("title") or pp.get("project") or pp.get("name") or ""
+        title = pp.get("title") or pp.get("project") or pp.get("name") or "a key project"
         context = pp.get("context") or pp.get("description") or ""
         impact = pp.get("impact") or pp.get("metrics") or pp.get("scale") or ""
-        tech_list = (pp.get("tech") or pp.get("technologies") or [])[:4]
-        tech_str = ", ".join(tech_list) if tech_list else ""
+        problem = pp.get("problem") or ""
+        tech_list = [
+            t for t in (pp.get("tech") or pp.get("technologies") or [])
+            if isinstance(t, str)
+        ][:5]
+        tech_str = ", ".join(tech_list)
 
-        line = f"In {title}"
+        # Build the project line
+        line = f"In **{title}**"
         if context:
-            line += f" ({context[:80]})"
-        line += ", "
+            line += f" ({context[:100].rstrip()})"
+        line += ", I "
+
         if impact:
-            line += impact[:200]
+            line += impact[:220].rstrip()
+        elif problem:
+            line += f"worked on {problem[:180].rstrip()}"
+        else:
+            line += "designed and shipped the core systems"
+
         if tech_str:
-            line += f" ({tech_str})"
+            line += f", using {tech_str}"
         line += "."
+
+        # Explicit connection to company
+        overlap = [t for t in tech_list if t.lower() in company_tech_lower]
+        if overlap:
+            line += (
+                f" The overlap with {company_name}'s stack ({', '.join(overlap)}) "
+                f"means I can contribute to your existing systems from day one."
+            )
+        elif sector_str and problem:
+            line += (
+                f" This experience is directly relevant to what {company_name} "
+                f"is building in the {sector_str} space."
+            )
+        elif research_summary:
+            line += (
+                f" This is precisely the kind of reliability and systems thinking "
+                f"that {company_name}'s work demands."
+            )
+        else:
+            line += (
+                f" This is directly applicable to the challenges {company_name} "
+                f"is tackling at this stage."
+            )
+
         project_paras.append(line)
 
-    lines: list[str] = [opener + "."]
-    lines.append(f"\nMy approach is simple: {wtb}")
-    lines.extend([f"\n{p}" for p in project_paras])
+    # If no relevant projects were found, build a generic but structured placeholder
+    if not project_paras:
+        wtb = sender_ctx["what_they_bring"] or "I build reliable, high-scale backend systems."
+        project_paras.append(
+            f"My recent work has focused on {wtb.lower().rstrip('.')}. "
+            f"The systems I have built deal with scale, reliability, and real user impact — "
+            f"which aligns with what {company_name} is working on."
+        )
 
-    # Terse skills
-    skills = sender_ctx["tech_skills"][:5]
-    if skills:
-        lines.append(f"\n{', '.join(skills)}.")
+    # --- Skills line ---
+    skills = [s for s in sender_ctx["tech_skills"][:7] if isinstance(s, str)]
+    skills_line = (
+        f"I am strongest in {', '.join(skills)}." if skills
+        else "My core stack is Python, SQL, and backend systems."
+    )
 
-    # Ask
-    if company_ctx["contact_is_new_recruit"]:
-        lines.append(f"\nWould you have 10 minutes to share advice on who to talk to at {company_name}?")
-    elif company_ctx["contact_is_founder"]:
-        lines.append("\nWould 15 mins work to compare notes?")
+    # --- Closing ask ---
+    if is_new_recruit:
+        ask = (
+            f"I am not asking for a referral — just genuine advice on the team at "
+            f"{company_name} and who I might best speak with. "
+            f"Would you be open to a 10-minute conversation?"
+        )
+    elif is_founder:
+        ask = "Would 15 minutes work to compare notes?"
     else:
-        lines.append("\nWould a quick call this week make sense?")
+        ask = "Would a quick call this week make sense?"
 
-    body = " ".join(lines).strip()
+    # --- Assemble body ---
+    if is_new_recruit:
+        # Shorter peer-to-peer format
+        body_parts = [
+            greeting,
+            "",
+            opening_para,
+            "",
+        ]
+        if project_paras:
+            body_parts.append(project_paras[0])
+            body_parts.append("")
+        body_parts += [
+            ask,
+            "",
+            f"Sincerely,\n{sender_name}",
+        ]
+    else:
+        # Full cover-letter-quality format
+        body_parts = [
+            greeting,
+            "",
+            opening_para,
+            "",
+            approach_line,
+            "",
+        ]
+        for para in project_paras:
+            body_parts.append(para)
+            body_parts.append("")
+        body_parts += [
+            skills_line,
+            "",
+            ask,
+            "",
+            f"Sincerely,\n{sender_name}",
+        ]
 
-    sub_a = f"{sender_name} → {company_name}"[:78]
-    sub_b = f"Quick question on {company_name[:30]}'s stack"
-    sub_c = f"{(relevant[0].get('title', '') if relevant else 'My work')} → {company_name[:30]}"
+    body = "\n".join(body_parts).strip()
+
+    # --- Subject lines ---
+    proj_title = relevant[0].get("title", "") if relevant else ""
+    sub_a = (
+        f"{proj_title} → {company_name}"[:78]
+        if proj_title
+        else f"{sender_name} → {company_name}"[:78]
+    )
+    job_title = job_postings[0].get("title", "") if job_postings else ""
+    sub_b = (
+        f"Quick intro — {sender_name} re: {job_title[:30]}"
+        if job_title
+        else f"Quick intro — {sender_name} → {company_name[:35]}"
+    )
+    sub_c = (
+        f"Quick question on {company_name[:30]}'s engineering challenges"
+        if is_founder
+        else f"Quick question on {company_name[:30]}'s stack"
+    )
 
     return {
         "subject_lines": [sub_a, sub_b, sub_c],
@@ -576,12 +795,12 @@ def _build_gemini_prompt(
 
 SENDER:
 Name: {sender_ctx['name']}
-What they bring (one-line brand): {sender_ctx['what_they_bring'] or '(not set)'}
+One-line brand: {sender_ctx['what_they_bring'] or '(not set)'}
 Primary tech skills: {skills_line}
 Recent experience:
 {exp_block}
 
-Top proof points to reference (use exact title strings in highlighted_proof_titles):
+Top proof points (use exact title strings in highlighted_proof_titles):
 {proof_json}
 
 RECIPIENT:
@@ -598,26 +817,33 @@ Stage: {company_ctx['stage']}
 Sector: {', '.join(company_ctx['sector'])}
 Tech stack: {', '.join(company_ctx['tech_stack'])}
 Headcount: {company_ctx['headcount'] or 'unknown'}
-Research summary: {company_ctx['research_summary'][:600] if company_ctx['research_summary'] else 'Not available'}
+Research summary: {company_ctx['research_summary'][:800] if company_ctx['research_summary'] else 'Not available'}
 
 Active job postings:
 {jobs_block}
 
-Recent signals:
+Recent signals (news, posts, updates):
 {signals_block}
 
-SUGGESTED HOOK (weave in or improve upon):
-{hook or 'Find the most specific opening from the signals / summary above.'}
+SUGGESTED HOOK (use this or find something more specific from the signals/summary):
+{hook or 'Find the most specific and recent signal from company data above to open with.'}
 
 TONE:
-Formality (1=casual, 10=formal): {tone.get('formal', 5)}
-Technical depth (1=light, 10=deep): {tone.get('technical', 5)}
+Formality (1=very casual, 10=very formal): {tone.get('formal', 6)}
+Technical depth (1=light/story-driven, 10=highly technical): {tone.get('technical', 6)}
 
 SPECIAL INSTRUCTIONS:
 {special_block}
 
 ---
-Write the email now. Remember: under 150 words, no filler, project-first, metrics where possible.
+CRITICAL REQUIREMENTS FOR THIS EMAIL:
+- Start with "Dear [First Name]," (use recipient name above)
+- Include "My approach is simple:" or "My work style:" as the second paragraph — do NOT skip this
+- 2 project paragraphs with bold project names, metrics, and an EXPLICIT connection to what {company_ctx['name']} is building
+- End with a terse skills line, one closing ask, then "Sincerely,\\n{sender_ctx['name']}"
+- LENGTH: {"150–200 words (new recruit — peer-to-peer, advice-seeking)" if company_ctx['contact_is_new_recruit'] else "250–350 words (cover-letter quality — formal, detailed, every sentence earns its place)"}
+- Every project paragraph must explicitly name why it is relevant to {company_ctx['name']}'s specific work
+
 Return ONLY the JSON object."""
 
 
