@@ -1,4 +1,9 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+function ngrokExtraHeaders(): Record<string, string> {
+  if (!API_BASE.includes("ngrok")) return {};
+  return { "ngrok-skip-browser-warning": "true" };
+}
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -8,6 +13,7 @@ function getToken(): string | null {
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
+    ...ngrokExtraHeaders(),
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string> || {}),
   };
@@ -35,7 +41,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
 
 export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
   const token = getToken();
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { ...ngrokExtraHeaders() };
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
   const res = await fetch(`${API_BASE}${path}`, {
@@ -58,7 +64,7 @@ export async function apiStreamUpload(
   onEvent: (event: import("@/types").ProcessingEvent) => void,
 ): Promise<void> {
   const token = getToken();
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { ...ngrokExtraHeaders() };
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
   const res = await fetch(`${API_BASE}${path}`, {
@@ -117,6 +123,7 @@ export function connectSSE<T>(
     try {
       const res = await fetch(`${API_BASE}${path}`, {
         headers: {
+          ...ngrokExtraHeaders(),
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       });

@@ -2,9 +2,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Mic, MicOff, ArrowRight, Loader2, Clock, AlertCircle, Square } from "lucide-react";
-import { apiFetch } from "@/lib/api";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { apiFetch, API_BASE } from "@/lib/api";
 
 type Status = "ready" | "connecting" | "listening" | "processing" | "speaking" | "active" | "complete";
 type Message = { role: "adam" | "user"; text: string };

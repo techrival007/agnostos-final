@@ -4,8 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Mic, MicOff, Square, Loader2, Clock, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { API_BASE } from "@/lib/api";
 
 type Status = "ready" | "connecting" | "listening" | "processing" | "speaking" | "active" | "complete";
 type Message = { role: "adam" | "user"; text: string };
