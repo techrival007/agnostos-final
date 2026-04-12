@@ -1,0 +1,97 @@
+@import "tailwindcss";
+
+:root {
+  --primary: #60a5fa;
+  --primary-soft: rgba(96, 165, 250, 0.1);
+  --background: #050505;
+  --surface: #0e0e0f;
+  --surface-elevated: #151517;
+  --border: rgba(255, 255, 255, 0.06);
+  --text-main: #fcfcfc;
+  --text-muted: #94a3b8;
+  --accent-glow: rgba(96, 165, 250, 0.12);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--text-main);
+}
+
+.bg-zen-gradient {
+  background: radial-gradient(circle at 50% 0%, rgba(96, 165, 250, 0.03), transparent 70%);
+}
+
+.soft-shadow {
+  box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.2), 0 0 0 1px var(--border);
+}
+
+.input-focus:focus-within {
+  border-color: rgba(96, 165, 250, 0.3);
+  box-shadow: 0 0 30px var(--accent-glow);
+}
+
+.card-zen {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.card-zen:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-4px);
+  background: var(--surface-elevated);
+}
+
+.stagger-reveal {
+  animation: reveal 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  opacity: 0;
+  transform: translateY(12px);
+}
+
+@keyframes reveal {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.nav-pill-active {
+  background: rgba(255, 255, 255, 0.05);
+  color: white;
+  position: relative;
+}
+
+.nav-pill-active::after {
+  content: '';
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  background: white;
+  border-radius: 50%;
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 10px;
+}
+
+input, textarea, select {
+  outline: none;
+}
+
+.actor-adam { color: #60a5fa; }
+.actor-theos { color: #a78bfa; }
+.actor-mercury { color: #fbbf24; }
+.actor-user { color: #34d399; }
+.actor-system { color: #94a3b8; }

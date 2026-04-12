@@ -1,0 +1,7 @@
+{
+  "dependencies": ["."],
+  "graphs": {
+    "company-search": "./theos/deepsearch/graph.py:graph"
+  },
+  "env": ".env"
+}
