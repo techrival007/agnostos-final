@@ -23,4 +23,4 @@ langchain
 langchain-google-genai
 google-genai
 langgraph-sdk
-langgraph-cli[inmem]
+langgraph-cli
