@@ -120,6 +120,16 @@ export default function MercuryPage() {
   const [previewEmailId, setPreviewEmailId] = useState<string | null>(null);
 
   const user = useAuthStore((s) => s.user);
+  const nylasConnected = !!user?.nylas_grant_id;
+
+  const nylasAuthQuery = useQuery({
+    queryKey: ["mercury", "nylas-auth-url"],
+    queryFn: () =>
+      apiFetch<{ auth_url: string | null }>("/api/mercury/nylas/auth-url"),
+    enabled: !nylasConnected,
+    staleTime: 5 * 60 * 1000,
+  });
+  const nylasAuthUrl = nylasAuthQuery.data?.auth_url ?? null;
 
   const pipelineQuery = useQuery({
     queryKey: ["mercury", "pipeline"],
@@ -381,6 +391,8 @@ export default function MercuryPage() {
                 onSkip={(id) => skipMutation.mutate(id)}
                 onPatch={(id, fields) => patchEmailMutation.mutate({ id, ...fields })}
                 actionPending={actionPending}
+                nylasConnected={nylasConnected}
+                nylasAuthUrl={nylasAuthUrl}
               />
             ))
           )}
@@ -405,6 +417,8 @@ function CampaignCard({
   onSkip,
   onPatch,
   actionPending,
+  nylasConnected,
+  nylasAuthUrl,
 }: {
   campaign: Campaign;
   expanded: boolean;
@@ -417,6 +431,8 @@ function CampaignCard({
   onSkip: (id: string) => void;
   onPatch: (id: string, fields: { subject?: string; body?: string }) => void;
   actionPending: boolean;
+  nylasConnected: boolean;
+  nylasAuthUrl: string | null;
 }) {
   const stats = useMemo(
     () => ({
@@ -516,6 +532,8 @@ function CampaignCard({
                       onSkip={onSkip}
                       onPatch={onPatch}
                       actionPending={actionPending}
+                      nylasConnected={nylasConnected}
+                      nylasAuthUrl={nylasAuthUrl}
                     />
                   )}
                 </li>
@@ -537,12 +555,16 @@ function EmailPreview({
   onSkip,
   onPatch,
   actionPending,
+  nylasConnected,
+  nylasAuthUrl,
 }: {
   email: OutreachEmail;
   onApproveAndSend: (id: string) => Promise<void>;
   onSkip: (id: string) => void;
   onPatch: (id: string, fields: { subject?: string; body?: string }) => void;
   actionPending: boolean;
+  nylasConnected: boolean;
+  nylasAuthUrl: string | null;
 }) {
   const hasSubjectOptions =
     !!email.subject_options && email.subject_options.length > 0;
@@ -556,6 +578,7 @@ function EmailPreview({
   const [editingBody, setEditingBody] = useState(false);
   const [bodyDraft, setBodyDraft] = useState(email.body ?? "");
   const [sending, setSending] = useState(false);
+  const [showNylasPrompt, setShowNylasPrompt] = useState(false);
 
   useEffect(() => {
     setSubject(email.subject ?? "");
@@ -572,6 +595,10 @@ function EmailPreview({
   };
 
   const handleApproveAndSend = async () => {
+    if (!nylasConnected) {
+      setShowNylasPrompt(true);
+      return;
+    }
     setSending(true);
     try {
       await onApproveAndSend(email.id);
@@ -674,6 +701,38 @@ function EmailPreview({
             {email.contact_name} &lt;{email.contact_email}&gt;
           </span>
         </p>
+      )}
+
+      {/* Nylas connect prompt */}
+      {showNylasPrompt && !nylasConnected && (
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 space-y-2">
+          <p className="text-sm text-amber-300">
+            Connect your Gmail or Outlook to send emails from your inbox.
+          </p>
+          <div className="flex items-center gap-2">
+            {nylasAuthUrl ? (
+              <a
+                href={nylasAuthUrl}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500/20 px-3 py-1.5 text-xs font-medium text-amber-200 hover:bg-amber-500/30 transition-colors"
+              >
+                <Mail className="w-3.5 h-3.5" />
+                Connect email
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            ) : (
+              <span className="text-xs text-[#64748b]">
+                Nylas is not configured on this server.
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowNylasPrompt(false)}
+              className="text-xs text-[#64748b] hover:text-[#94a3b8] transition-colors"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Actions */}

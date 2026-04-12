@@ -121,14 +121,9 @@ async def send_outreach_email(
     now = datetime.now(timezone.utc)
     client = _get_nylas_client()
 
-    if not client or not user.nylas_grant_id:
-        # Nylas not configured — simulate send for dev/testing
-        log.warning(
-            "Simulated send for email %s — client=%s grant_id=%s",
-            outreach_email_id,
-            bool(client),
-            bool(user.nylas_grant_id),
-        )
+    if not client:
+        # Nylas SDK not available at all — simulate for local dev only
+        log.warning("Simulated send for email %s — Nylas not installed/configured", outreach_email_id)
         await db.execute(
             update(OutreachEmail)
             .where(OutreachEmail.id == outreach_email_id)
@@ -139,6 +134,13 @@ async def send_outreach_email(
             "status": "sent",
             "message_id": None,
             "note": "Nylas not configured — simulated send only",
+        }
+
+    if not user.nylas_grant_id:
+        return {
+            "status": "error",
+            "detail": "Connect your email inbox before sending. Use the Nylas connect button to link Gmail or Outlook.",
+            "code": "NYLAS_NOT_CONNECTED",
         }
 
     # Nylas SDK is synchronous — run in a thread to avoid blocking the event loop
