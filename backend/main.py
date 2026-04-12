@@ -1,9 +1,21 @@
+import logging
+import sys
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from config import get_settings
 from database import engine, Base
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s │ %(levelname)-7s │ %(name)-22s │ %(message)s",
+    datefmt="%H:%M:%S",
+    stream=sys.stdout,
+    force=True,
+)
+logging.getLogger("theos.deepsearch").setLevel(logging.DEBUG)
+logging.getLogger("theos.router").setLevel(logging.DEBUG)
 
 import shared.models  # noqa: F401
 import adam.models  # noqa: F401
@@ -52,6 +64,7 @@ from analytics.router import router as analytics_router
 from knowledge.router import router as knowledge_router
 from chat.router import router as chat_router
 from notifications.router import router as notifications_router
+from settings.router import router as settings_router
 
 app.include_router(auth_router)
 app.include_router(adam_router)
@@ -61,6 +74,7 @@ app.include_router(analytics_router)
 app.include_router(knowledge_router)
 app.include_router(chat_router)
 app.include_router(notifications_router)
+app.include_router(settings_router)
 
 
 @app.get("/api/health")

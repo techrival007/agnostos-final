@@ -104,3 +104,67 @@ export async function apiStreamUpload(
     } catch {}
   }
 }
+
+export function connectSSE<T>(
+  path: string,
+  onEvent: (event: T) => void,
+  onError?: (err: Error) => void,
+): () => void {
+  let cancelled = false;
+  const token = getToken();
+
+  async function connect() {
+    try {
+      const res = await fetch(`${API_BASE}${path}`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: "SSE connection failed" }));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("No response stream");
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (!cancelled) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith("data: ")) {
+            try {
+              const event = JSON.parse(trimmed.slice(6)) as T;
+              onEvent(event);
+            } catch {}
+          }
+        }
+      }
+
+      if (buffer.trim().startsWith("data: ")) {
+        try {
+          const event = JSON.parse(buffer.trim().slice(6)) as T;
+          onEvent(event);
+        } catch {}
+      }
+    } catch (err) {
+      if (!cancelled) onError?.(err as Error);
+    }
+  }
+
+  connect();
+
+  return () => {
+    cancelled = true;
+  };
+}

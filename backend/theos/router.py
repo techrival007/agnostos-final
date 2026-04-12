@@ -1,17 +1,23 @@
 import asyncio
+import json
+import logging
 
-from fastapi import APIRouter, Depends, Query, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, Query, HTTPException, BackgroundTasks, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from database import get_db
 from shared.models import User
-from theos.models import Company, CompanyResearch, Contact, LinkedInSignal, JobListing, SearchJob
+from theos.models import Company, CompanyResearch, Contact, LinkedInSignal, JobListing, SearchJob, GithubJobListing
 from theos.schemas import (
     CompanyOut, CompanyDetailOut, CompanyResearchOut, ContactOut,
     SignalOut, JobListingOut, SearchJobOut, DeepSearchParams,
+    GithubJobOut, GithubJobsRefreshResult,
 )
 from auth.service import get_current_user
+
+logger = logging.getLogger("theos.router")
 
 router = APIRouter(prefix="/api/theos", tags=["theos"])
 
@@ -201,6 +207,100 @@ async def list_job_listings(
     return out
 
 
+# ─── GitHub Jobs ─────────────────────────────────────────────
+
+@router.get("/github-jobs", response_model=list[GithubJobOut])
+async def list_github_jobs(
+    search: str | None = None,
+    job_type: str | None = None,
+    region: str | None = None,
+    source_repo: str | None = None,
+    category: str | None = None,
+    sort: str = "posted_at",
+    limit: int = Query(default=50, le=500),
+    offset: int = 0,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    query = select(GithubJobListing)
+
+    if search:
+        term = f"%{search}%"
+        query = query.where(
+            GithubJobListing.position.ilike(term)
+            | GithubJobListing.company.ilike(term)
+            | GithubJobListing.location.ilike(term)
+        )
+    if job_type:
+        query = query.where(GithubJobListing.job_type == job_type)
+    if region:
+        query = query.where(GithubJobListing.region == region)
+    if source_repo:
+        query = query.where(GithubJobListing.source_repo == source_repo)
+    if category:
+        query = query.where(GithubJobListing.category == category)
+
+    if sort == "posted_at":
+        query = query.order_by(GithubJobListing.posted_at.desc().nullslast())
+    elif sort == "company":
+        query = query.order_by(GithubJobListing.company.asc())
+    elif sort == "age":
+        query = query.order_by(GithubJobListing.age_days.asc().nullslast())
+    else:
+        query = query.order_by(GithubJobListing.scraped_at.desc())
+
+    query = query.offset(offset).limit(limit)
+    result = await db.execute(query)
+    listings = result.scalars().all()
+
+    return [
+        GithubJobOut(
+            id=str(j.id),
+            company=j.company,
+            company_url=j.company_url,
+            position=j.position,
+            location=j.location,
+            salary=j.salary,
+            apply_url=j.apply_url,
+            age_days=j.age_days,
+            posted_at=j.posted_at,
+            category=j.category,
+            job_type=j.job_type,
+            region=j.region,
+            source_repo=j.source_repo,
+            scraped_at=j.scraped_at,
+        )
+        for j in listings
+    ]
+
+
+@router.get("/github-jobs/count")
+async def github_jobs_count(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(func.count(GithubJobListing.id)))
+    total = result.scalar() or 0
+
+    result2 = await db.execute(select(func.max(GithubJobListing.scraped_at)))
+    last_scraped = result2.scalar()
+
+    return {"total": total, "last_scraped_at": last_scraped}
+
+
+@router.post("/github-jobs/refresh", response_model=GithubJobsRefreshResult)
+async def refresh_github_jobs_endpoint(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from theos.github_jobs import refresh_github_jobs
+    total = await refresh_github_jobs(db)
+    return GithubJobsRefreshResult(
+        total_jobs=total,
+        message=f"Successfully scraped {total} jobs from GitHub repos",
+    )
+
+
 # ─── Deep Search ─────────────────────────────────────────────
 
 @router.post("/deepsearch/start", response_model=SearchJobOut)
@@ -286,3 +386,103 @@ async def list_deepsearch_jobs(
         )
         for j in jobs
     ]
+
+
+@router.post("/deepsearch/{job_id}/cancel")
+async def cancel_deepsearch(
+    job_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Cancel a running deep search job."""
+    result = await db.execute(
+        select(SearchJob).where(SearchJob.id == job_id, SearchJob.user_id == user.id)
+    )
+    job = result.scalar_one_or_none()
+    if not job:
+        raise HTTPException(status_code=404, detail="Search job not found")
+    if job.status not in ("pending", "running"):
+        raise HTTPException(status_code=400, detail="Job is not running")
+
+    from theos.search_service import cancel_job
+    cancel_job(job_id)
+
+    job.status = "cancelled"
+    await db.commit()
+    logger.info("Deep search job %s cancelled by user %s", job_id, user.id)
+    return {"ok": True, "status": "cancelled"}
+
+
+@router.delete("/deepsearch/{job_id}")
+async def delete_deepsearch(
+    job_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete a deep search job record."""
+    result = await db.execute(
+        select(SearchJob).where(SearchJob.id == job_id, SearchJob.user_id == user.id)
+    )
+    job = result.scalar_one_or_none()
+    if not job:
+        raise HTTPException(status_code=404, detail="Search job not found")
+
+    if job.status in ("pending", "running"):
+        from theos.search_service import cancel_job
+        cancel_job(job_id)
+
+    from theos.search_service import cleanup_job
+    cleanup_job(job_id)
+
+    await db.delete(job)
+    await db.commit()
+    logger.info("Deep search job %s deleted by user %s", job_id, user.id)
+    return {"ok": True}
+
+
+@router.get("/deepsearch/{job_id}/stream")
+async def stream_deepsearch_events(
+    job_id: str,
+    request: Request,
+    after: int = Query(default=0, ge=0),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """SSE endpoint: streams real-time progress events for a deep search job."""
+    result = await db.execute(
+        select(SearchJob).where(SearchJob.id == job_id, SearchJob.user_id == user.id)
+    )
+    job = result.scalar_one_or_none()
+    if not job:
+        raise HTTPException(status_code=404, detail="Search job not found")
+
+    from theos.search_service import get_events
+
+    async def event_generator():
+        cursor = after
+        while True:
+            if await request.is_disconnected():
+                logger.debug("SSE client disconnected for job %s", job_id)
+                break
+
+            events, is_done = get_events(job_id, cursor)
+            for ev in events:
+                data = json.dumps(ev, default=str)
+                yield f"data: {data}\n\n"
+                cursor += 1
+
+            if is_done:
+                yield f"data: {json.dumps({'type': 'stream_end', 'phase': 'done'})}\n\n"
+                break
+
+            await asyncio.sleep(0.5)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

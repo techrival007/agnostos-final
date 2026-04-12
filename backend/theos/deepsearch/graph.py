@@ -43,7 +43,6 @@ def _extract_search_params(topic: str) -> dict:
     defaults = {
         "target_count": "10",
         "location": "Any",
-        "recency": "3 months",
         "sector": "Any",
     }
     for line in topic.split("\n"):
@@ -52,8 +51,6 @@ def _extract_search_params(topic: str) -> dict:
             defaults["target_count"] = line.split(":", 1)[1].strip()
         elif line.startswith("location:"):
             defaults["location"] = line.split(":", 1)[1].strip()
-        elif line.startswith("recency:"):
-            defaults["recency"] = line.split(":", 1)[1].strip()
         elif line.startswith("sector:"):
             defaults["sector"] = line.split(":", 1)[1].strip()
     return defaults
@@ -82,7 +79,6 @@ def generate_query(state: OverallState, config: RunnableConfig) -> QueryGenerati
         number_queries=state["initial_search_query_count"],
         target_count=params["target_count"],
         location=params["location"],
-        recency=params["recency"],
         sector=params["sector"],
     )
     result = structured_llm.invoke(formatted_prompt)

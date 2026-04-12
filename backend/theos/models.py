@@ -138,6 +138,25 @@ class JobListingRelevance(Base):
     computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class GithubJobListing(Base):
+    __tablename__ = "github_job_listings"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    company: Mapped[str] = mapped_column(String, nullable=False)
+    company_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    position: Mapped[str] = mapped_column(String, nullable=False)
+    location: Mapped[str | None] = mapped_column(String, nullable=True)
+    salary: Mapped[str | None] = mapped_column(String, nullable=True)
+    apply_url: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    age_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    posted_at: Mapped[date | None] = mapped_column(Date, nullable=True)
+    category: Mapped[str | None] = mapped_column(String, nullable=True)
+    job_type: Mapped[str] = mapped_column(String, nullable=False)
+    region: Mapped[str] = mapped_column(String, nullable=False)
+    source_repo: Mapped[str] = mapped_column(String, nullable=False)
+    scraped_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class SearchJob(Base):
     __tablename__ = "search_jobs"
 

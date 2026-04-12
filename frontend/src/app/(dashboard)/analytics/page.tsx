@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { Send, MailOpen, MessageCircleReply, Zap } from "lucide-react";
+import { Send, MailOpen, MessageCircleReply, Zap, ArrowUpRight, Activity } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import type { Analytics } from "@/types";
 import { cn } from "@/lib/utils";
@@ -30,6 +30,9 @@ export default function AnalyticsPage() {
   const openedW = `${Math.min(100, (opened / funnelMax) * 100)}%`;
   const repliedW = `${Math.min(100, (replied / funnelMax) * 100)}%`;
   const sentW = "100%";
+  const daily = a?.daily_sends ?? [];
+  const dailyPeak = Math.max(...daily.map((point) => point.count), 1);
+  const recentDaily = daily.slice(-10);
 
   return (
     <div
@@ -39,11 +42,15 @@ export default function AnalyticsPage() {
         ["--border" as string]: "rgba(255,255,255,0.06)",
       }}
     >
-      <div className="mb-10 flex flex-col gap-2">
+      <div className="mb-10 flex flex-col gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">Analytics</h1>
         <p className="text-sm text-[#94a3b8]">
-          Outreach performance and campaign outcomes.
+          Outreach performance, campaign health, and response momentum.
         </p>
+        <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.02] px-3 py-1.5 text-xs text-[#93c5fd] w-fit">
+          <Activity className="w-3.5 h-3.5" />
+          Live overview of sends, opens, and replies
+        </div>
       </div>
 
       {analyticsQuery.isLoading && (
@@ -55,7 +62,7 @@ export default function AnalyticsPage() {
 
       {a && (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-12">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-8">
             <StatCard
               icon={Send}
               label="Total sent"
@@ -82,7 +89,52 @@ export default function AnalyticsPage() {
             />
           </div>
 
-          <section className="mb-12">
+          <section className="mb-8 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="card-zen rounded-2xl p-6">
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-[#e2e8f0]">Send trend (recent)</h2>
+                <span className="text-xs text-[#64748b]">Last {recentDaily.length} points</span>
+              </div>
+              {recentDaily.length > 0 ? (
+                <div className="grid grid-cols-10 gap-2 items-end h-36">
+                  {recentDaily.map((point) => (
+                    <div key={point.date} className="flex flex-col items-center gap-2">
+                      <div className="h-28 flex items-end w-full">
+                        <div
+                          className="w-full rounded-md bg-gradient-to-t from-[#60a5fa]/70 to-[#34d399]/60"
+                          style={{ height: `${Math.max(12, (point.count / dailyPeak) * 100)}%` }}
+                          title={`${point.date}: ${point.count}`}
+                        />
+                      </div>
+                      <span className="text-[10px] text-[#64748b] tabular-nums">
+                        {point.date.slice(5)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-[#64748b]">No daily send trend available yet.</p>
+              )}
+            </div>
+            <div className="card-zen rounded-2xl p-6">
+              <h2 className="text-sm font-semibold text-[#e2e8f0] mb-4">Quick insights</h2>
+              <div className="space-y-3 text-sm">
+                <InsightRow label="Open rate" value={`${openRate.toFixed(1)}%`} />
+                <InsightRow label="Reply rate" value={`${replyRate.toFixed(1)}%`} />
+                <InsightRow label="Active campaigns" value={String(active)} />
+                <InsightRow label="Profile completeness" value={`${completeness.toFixed(0)}%`} />
+              </div>
+              <Link
+                href="/mercury"
+                className="mt-5 inline-flex items-center gap-1.5 text-xs text-[#93c5fd] hover:text-[#bfdbfe]"
+              >
+                Open Mercury
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </section>
+
+          <section className="mb-8">
             <h2 className="text-sm font-semibold text-[#e2e8f0] mb-4">
               Engagement funnel
             </h2>
@@ -103,7 +155,7 @@ export default function AnalyticsPage() {
             </div>
           </section>
 
-          <section className="mb-12">
+          <section className="mb-8">
             <h2 className="text-sm font-semibold text-[#e2e8f0] mb-4">
               Top campaigns
             </h2>
@@ -155,7 +207,7 @@ export default function AnalyticsPage() {
             </div>
           </section>
 
-          <section>
+          <section className="mb-2">
             <h2 className="text-sm font-semibold text-[#e2e8f0] mb-3">
               Profile completeness
             </h2>
@@ -183,6 +235,15 @@ export default function AnalyticsPage() {
           </section>
         </>
       )}
+    </div>
+  );
+}
+
+function InsightRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2.5">
+      <span className="text-[#94a3b8]">{label}</span>
+      <span className="tabular-nums text-[#e2e8f0] font-medium">{value}</span>
     </div>
   );
 }

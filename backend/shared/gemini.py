@@ -38,6 +38,12 @@ def _get_client():
     return _client
 
 
+def set_gemini_api_key(api_key: str) -> None:
+    global _client
+    settings.gemini_api_key = api_key
+    _client = None
+
+
 # ---------------------------------------------------------------------------
 # Public helpers
 # ---------------------------------------------------------------------------

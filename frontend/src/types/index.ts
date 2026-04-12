@@ -204,6 +204,33 @@ export interface JobListingItem {
   company_name: string | null;
 }
 
+export interface GithubJob {
+  id: string;
+  company: string;
+  company_url: string | null;
+  position: string;
+  location: string | null;
+  salary: string | null;
+  apply_url: string;
+  age_days: number | null;
+  posted_at: string | null;
+  category: string | null;
+  job_type: string;
+  region: string;
+  source_repo: string;
+  scraped_at: string | null;
+}
+
+export interface GithubJobsRefreshResult {
+  total_jobs: number;
+  message: string;
+}
+
+export interface GithubJobsCount {
+  total: number;
+  last_scraped_at: string | null;
+}
+
 export interface PipelineColumn {
   status: string;
   label: string;
@@ -313,7 +340,7 @@ export interface AppNotification {
 
 export interface SearchJob {
   id: string;
-  status: "pending" | "running" | "completed" | "failed";
+  status: "pending" | "running" | "completed" | "failed" | "cancelled";
   parameters: DeepSearchParams | null;
   result_summary: string | null;
   companies_found: number;
@@ -325,6 +352,49 @@ export interface SearchJob {
 export interface DeepSearchParams {
   company_count: number;
   location: string;
-  recency: string;
   sector: string;
+}
+
+export interface DeepSearchEvent {
+  type:
+    | "search_started"
+    | "phase_start"
+    | "queries_generated"
+    | "research_result"
+    | "reflection_done"
+    | "reflection_gap"
+    | "answer_ready"
+    | "transcript_saved"
+    | "companies_extracted"
+    | "companies_saved"
+    | "search_completed"
+    | "search_failed"
+    | "stream_end";
+  phase: "init" | "generate_query" | "web_research" | "reflection" | "finalize_answer" | "saving" | "analyzing" | "done" | "error";
+  title: string;
+  detail?: string;
+  timestamp?: string;
+  params?: DeepSearchParams;
+  queries?: string[];
+  query?: string;
+  sources_count?: number;
+  total_sources?: number;
+  follow_up_queries?: string[];
+  loop?: number;
+  is_sufficient?: boolean;
+  preview?: string;
+  companies_found?: number;
+  companies?: { name: string; stage?: string; hq_location?: string; funding_amount_usd?: number }[];
+  error?: string;
+}
+
+export interface ProviderStatus {
+  id: string;
+  label: string;
+  configured: boolean;
+  editable?: boolean;
+}
+
+export interface ProviderSettingsResponse {
+  providers: ProviderStatus[];
 }

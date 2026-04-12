@@ -93,10 +93,34 @@ class JobListingOut(BaseModel):
         from_attributes = True
 
 
+class GithubJobOut(BaseModel):
+    id: str
+    company: str
+    company_url: str | None = None
+    position: str
+    location: str | None = None
+    salary: str | None = None
+    apply_url: str
+    age_days: int | None = None
+    posted_at: date | None = None
+    category: str | None = None
+    job_type: str
+    region: str
+    source_repo: str
+    scraped_at: datetime | None = None
+
+    class Config:
+        from_attributes = True
+
+
+class GithubJobsRefreshResult(BaseModel):
+    total_jobs: int
+    message: str
+
+
 class DeepSearchParams(BaseModel):
     company_count: int = 10
     location: str = "Any"
-    recency: str = "3 months"
     sector: str = "Any"
 
 

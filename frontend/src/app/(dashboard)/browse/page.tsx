@@ -6,459 +6,518 @@ import {
   Search,
   MapPin,
   ExternalLink,
-  Radar,
+  RefreshCw,
+  SlidersHorizontal,
+  Briefcase,
+  GraduationCap,
+  Globe,
+  DollarSign,
+  Clock,
+  Building2,
+  ChevronDown,
   X,
   Loader2,
-  CheckCircle2,
-  AlertCircle,
-  Clock,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
-import type { JobListingItem, SearchJob, DeepSearchParams } from "@/types";
+import type { GithubJob, GithubJobsRefreshResult, GithubJobsCount } from "@/types";
 import { cn, formatDate } from "@/lib/utils";
 
-const EMPLOYMENT = [
-  { value: "", label: "All" },
-  { value: "full-time", label: "Full-time" },
-  { value: "part-time", label: "Part-time" },
-  { value: "internship", label: "Internship" },
-  { value: "contract", label: "Contract" },
+const JOB_TYPE_OPTIONS = [
+  { value: "", label: "All types", icon: Briefcase },
+  { value: "internship", label: "Internship", icon: Briefcase },
+  { value: "new_grad", label: "New Grad", icon: GraduationCap },
+] as const;
+
+const REGION_OPTIONS = [
+  { value: "", label: "All regions" },
+  { value: "usa", label: "USA" },
+  { value: "international", label: "International" },
 ] as const;
 
 const SOURCE_OPTIONS = [
-  { value: "", label: "All sources" },
-  { value: "greenhouse", label: "Greenhouse" },
-  { value: "lever", label: "Lever" },
-  { value: "linkedin", label: "LinkedIn" },
-  { value: "ashby", label: "Ashby" },
-  { value: "crunchbase", label: "Crunchbase" },
-];
-
-const COMPANY_COUNTS = [5, 10, 25, 50] as const;
-const LOCATIONS = ["Any", "US", "Europe", "India", "Southeast Asia", "Middle East"] as const;
-const RECENCY_OPTIONS = [
-  { value: "1 week", label: "Last week" },
-  { value: "1 month", label: "Last month" },
-  { value: "3 months", label: "Last 3 months" },
-  { value: "6 months", label: "Last 6 months" },
-  { value: "1 year", label: "Last year" },
+  { value: "", label: "All fields" },
+  { value: "ai", label: "AI / ML" },
+  { value: "swe", label: "SWE" },
 ] as const;
 
-function employmentLabel(v: string | null): string {
-  if (!v) return "Role";
-  const m: Record<string, string> = {
-    "full-time": "Full-time",
-    "part-time": "Part-time",
-    internship: "Internship",
-    contract: "Contract",
-  };
-  return m[v] ?? v;
+const CATEGORY_OPTIONS = [
+  { value: "", label: "All tiers" },
+  { value: "FAANG+", label: "FAANG+" },
+  { value: "Quant", label: "Quant" },
+  { value: "Other", label: "Other" },
+] as const;
+
+const SORT_OPTIONS = [
+  { value: "posted_at", label: "Most Recent" },
+  { value: "age", label: "Newest First" },
+  { value: "company", label: "Company A-Z" },
+] as const;
+
+function timeSince(dateStr: string | null): string {
+  if (!dateStr) return "";
+  const posted = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - posted.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "1d ago";
+  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+  return `${Math.floor(diffDays / 30)}mo ago`;
 }
 
-const zenPage = "min-h-full px-6 py-10 md:px-10 max-w-5xl mx-auto text-[#fcfcfc]";
+function categoryBadgeStyle(cat: string | null): string {
+  switch (cat) {
+    case "FAANG+":
+      return "border-violet-500/30 bg-violet-500/10 text-violet-300";
+    case "Quant":
+      return "border-amber-500/30 bg-amber-500/10 text-amber-300";
+    case "Other":
+      return "border-[var(--border)] bg-white/5 text-[var(--text-muted)]";
+    default:
+      return "border-[var(--border)] bg-white/5 text-[var(--text-muted)]";
+  }
+}
 
-const STATUS_ICON: Record<string, typeof Clock> = {
-  pending: Clock,
-  running: Loader2,
-  completed: CheckCircle2,
-  failed: AlertCircle,
-};
-
-const STATUS_STYLE: Record<string, string> = {
-  pending: "text-amber-400 bg-amber-500/10 border-amber-500/20",
-  running: "text-sky-400 bg-sky-500/10 border-sky-500/20",
-  completed: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
-  failed: "text-red-400 bg-red-500/10 border-red-500/20",
-};
+function sourceRepoBadge(repo: string): string {
+  return repo === "ai"
+    ? "border-cyan-500/30 bg-cyan-500/10 text-cyan-300"
+    : "border-emerald-500/30 bg-emerald-500/10 text-emerald-300";
+}
 
 export default function BrowsePage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [employmentType, setEmploymentType] = useState("");
-  const [remoteOnly, setRemoteOnly] = useState(false);
-  const [source, setSource] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [modalOpen, setModalOpen] = useState(false);
-
-  const [dsParams, setDsParams] = useState<DeepSearchParams>({
-    company_count: 10,
-    location: "Any",
-    recency: "3 months",
-    sector: "",
-  });
-  const [customLocation, setCustomLocation] = useState("");
+  const [jobType, setJobType] = useState("");
+  const [region, setRegion] = useState("");
+  const [sourceRepo, setSourceRepo] = useState("");
+  const [category, setCategory] = useState("");
+  const [sort, setSort] = useState("posted_at");
+  const [limit, setLimit] = useState(50);
 
   const queryString = useMemo(() => {
     const p = new URLSearchParams();
-    p.set("limit", "50");
+    p.set("limit", String(limit));
+    p.set("sort", sort);
     if (debouncedSearch.trim()) p.set("search", debouncedSearch.trim());
-    if (employmentType) p.set("employment_type", employmentType);
-    if (remoteOnly) p.set("remote_ok", "true");
-    if (source) p.set("source", source);
+    if (jobType) p.set("job_type", jobType);
+    if (region) p.set("region", region);
+    if (sourceRepo) p.set("source_repo", sourceRepo);
+    if (category) p.set("category", category);
     return p.toString();
-  }, [debouncedSearch, employmentType, remoteOnly, source]);
+  }, [debouncedSearch, jobType, region, sourceRepo, category, sort, limit]);
 
-  const listingsQuery = useQuery({
-    queryKey: ["theos", "listings", queryString],
+  const jobsQuery = useQuery({
+    queryKey: ["github-jobs", queryString],
     queryFn: () =>
-      apiFetch<JobListingItem[]>(`/api/theos/listings?${queryString}`),
+      apiFetch<GithubJob[]>(`/api/theos/github-jobs?${queryString}`),
   });
 
-  const historyQuery = useQuery({
-    queryKey: ["theos", "deepsearch", "history"],
+  const countQuery = useQuery({
+    queryKey: ["github-jobs-count"],
     queryFn: () =>
-      apiFetch<SearchJob[]>("/api/theos/deepsearch/history?limit=10"),
+      apiFetch<GithubJobsCount>("/api/theos/github-jobs/count"),
   });
 
-  const startSearch = useMutation({
-    mutationFn: (params: DeepSearchParams) =>
-      apiFetch<SearchJob>("/api/theos/deepsearch/start", {
+  const refreshMutation = useMutation({
+    mutationFn: () =>
+      apiFetch<GithubJobsRefreshResult>("/api/theos/github-jobs/refresh", {
         method: "POST",
-        body: JSON.stringify(params),
       }),
     onSuccess: () => {
-      setModalOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["theos", "deepsearch", "history"] });
+      queryClient.invalidateQueries({ queryKey: ["github-jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["github-jobs-count"] });
     },
   });
 
-  const handleStartSearch = useCallback(() => {
-    const params = {
-      ...dsParams,
-      location: dsParams.location === "Custom" ? customLocation || "Any" : dsParams.location,
-      sector: dsParams.sector || "Any",
-    };
-    startSearch.mutate(params);
-  }, [dsParams, customLocation, startSearch]);
+  const handleSearch = useCallback(() => {
+    setDebouncedSearch(search);
+    setLimit(50);
+  }, [search]);
 
-  const handleDefaults = () => {
-    setDsParams({ company_count: 10, location: "Any", recency: "3 months", sector: "" });
-    setCustomLocation("");
-  };
+  const clearFilters = useCallback(() => {
+    setSearch("");
+    setDebouncedSearch("");
+    setJobType("");
+    setRegion("");
+    setSourceRepo("");
+    setCategory("");
+    setSort("posted_at");
+    setLimit(50);
+  }, []);
+
+  const hasFilters = debouncedSearch || jobType || region || sourceRepo || category;
+
+  const loadMore = useCallback(() => {
+    setLimit((prev) => prev + 50);
+  }, []);
+
+  const jobs = jobsQuery.data ?? [];
 
   return (
-    <div
-      className={zenPage}
-      style={{
-        backgroundColor: "#050505",
-        ["--border" as string]: "rgba(255,255,255,0.06)",
-      }}
-    >
-      {/* Header with Deep Search button */}
-      <div className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <div className="p-6 lg:p-8 max-w-[1400px] mx-auto">
+      {/* Header */}
+      <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Browse</h1>
-          <p className="mt-2 text-sm text-[#94a3b8]">
-            Job listings and company discovery powered by Theos.
+          <h1 className="text-2xl font-semibold text-white tracking-tight">
+            Browse Jobs
+          </h1>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
+            {countQuery.data ? (
+              <>
+                <span className="text-white font-medium">
+                  {countQuery.data.total.toLocaleString()}
+                </span>{" "}
+                jobs from AI & SWE repos
+                {countQuery.data.last_scraped_at && (
+                  <span>
+                    {" "}
+                    · last updated{" "}
+                    {timeSince(countQuery.data.last_scraped_at)}
+                  </span>
+                )}
+              </>
+            ) : (
+              "Loading job data..."
+            )}
           </p>
         </div>
         <button
-          onClick={() => setModalOpen(true)}
-          className="inline-flex items-center gap-2 rounded-2xl bg-[#60a5fa]/10 border border-[#60a5fa]/20 px-5 py-2.5 text-sm font-medium text-[#93c5fd] hover:bg-[#60a5fa]/20 transition-all"
+          onClick={() => refreshMutation.mutate()}
+          disabled={refreshMutation.isPending}
+          className={cn(
+            "inline-flex items-center gap-2 rounded-2xl border px-5 py-2.5 text-sm font-medium transition-all shrink-0",
+            refreshMutation.isPending
+              ? "border-white/10 bg-white/5 text-[var(--text-muted)] cursor-not-allowed"
+              : "border-[#60a5fa]/20 bg-[#60a5fa]/10 text-[#93c5fd] hover:bg-[#60a5fa]/20",
+          )}
         >
-          <Radar className="w-4 h-4" />
-          Start Deep Search
+          {refreshMutation.isPending ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Fetching...
+            </>
+          ) : (
+            <>
+              <RefreshCw className="w-4 h-4" />
+              Refresh Data
+            </>
+          )}
         </button>
-      </div>
+      </header>
 
-      {/* Search History */}
-      {(historyQuery.data?.length ?? 0) > 0 && (
-        <div className="mb-10">
-          <h2 className="text-sm font-medium text-[#94a3b8] mb-3">Recent searches</h2>
-          <div className="flex flex-wrap gap-2">
-            {historyQuery.data!.map((job) => {
-              const Icon = STATUS_ICON[job.status] || Clock;
-              return (
-                <div
-                  key={job.id}
-                  className={cn(
-                    "inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-medium",
-                    STATUS_STYLE[job.status] || STATUS_STYLE.pending
-                  )}
-                >
-                  <Icon className={cn("w-3.5 h-3.5", job.status === "running" && "animate-spin")} />
-                  <span>
-                    {job.parameters?.company_count ?? "?"} companies
-                    {job.parameters?.location && job.parameters.location !== "Any"
-                      ? ` · ${job.parameters.location}`
-                      : ""}
-                  </span>
-                  {job.status === "completed" && (
-                    <span className="text-[10px] opacity-70">
-                      ({job.companies_found} found)
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+      {refreshMutation.isSuccess && (
+        <div className="mb-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-2.5 text-sm text-emerald-300">
+          {refreshMutation.data.message}
+        </div>
+      )}
+      {refreshMutation.isError && (
+        <div className="mb-4 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-sm text-red-300">
+          {(refreshMutation.error as Error)?.message || "Refresh failed"}
         </div>
       )}
 
-      {/* Job search & filters */}
-      <div className="relative mb-6">
+      {/* Search */}
+      <div className="relative mb-5">
         <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748b]" />
         <input
           type="search"
-          placeholder="Search titles..."
+          placeholder="Search by position, company, or location..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") setDebouncedSearch(search);
+            if (e.key === "Enter") handleSearch();
           }}
-          className="w-full rounded-2xl border border-[var(--border)] bg-white/[0.03] py-3 pl-11 pr-4 text-sm text-[#e2e8f0] placeholder:text-[#64748b] focus:border-[#60a5fa]/40 focus:outline-none focus:ring-1 focus:ring-[#60a5fa]/30"
+          className="w-full rounded-2xl border border-[var(--border)] bg-white/[0.03] py-3 pl-11 pr-24 text-sm text-[#e2e8f0] placeholder:text-[#64748b] focus:border-[#60a5fa]/40 focus:outline-none focus:ring-1 focus:ring-[#60a5fa]/30"
         />
         <button
           type="button"
-          onClick={() => setDebouncedSearch(search)}
-          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl bg-white/5 px-3 py-1.5 text-xs font-medium text-[#94a3b8] hover:bg-white/10 hover:text-[#e2e8f0]"
+          onClick={handleSearch}
+          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl bg-white/5 px-4 py-1.5 text-xs font-medium text-[#94a3b8] hover:bg-white/10 hover:text-[#e2e8f0] transition-colors"
         >
           Search
         </button>
       </div>
 
-      <div className="mb-8 flex flex-wrap items-center gap-3">
-        <select
-          value={employmentType}
-          onChange={(e) => setEmploymentType(e.target.value)}
-          className="rounded-xl border border-[var(--border)] bg-[#0a0a0a] px-3 py-2 text-sm text-[#e2e8f0]"
-        >
-          {EMPLOYMENT.map((o) => (
-            <option key={o.value || "all"} value={o.value}>{o.label}</option>
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-3 mb-6">
+        {/* Job Type Chips */}
+        <div className="flex gap-1.5">
+          {JOB_TYPE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value || "all-type"}
+              onClick={() => { setJobType(opt.value); setLimit(50); }}
+              className={cn(
+                "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
+                jobType === opt.value
+                  ? "bg-white/10 text-white border-white/20"
+                  : "bg-transparent text-[var(--text-muted)] border-[var(--border)] hover:border-white/15 hover:text-white",
+              )}
+            >
+              {opt.label}
+            </button>
           ))}
-        </select>
-        <button
-          type="button"
-          onClick={() => setRemoteOnly((v) => !v)}
-          className={cn(
-            "rounded-xl border px-3 py-2 text-sm font-medium transition-colors",
-            remoteOnly
-              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
-              : "border-[var(--border)] bg-white/[0.02] text-[#94a3b8] hover:bg-white/5"
-          )}
-        >
-          Remote only
-        </button>
-        <select
-          value={source}
-          onChange={(e) => setSource(e.target.value)}
-          className="rounded-xl border border-[var(--border)] bg-[#0a0a0a] px-3 py-2 text-sm text-[#e2e8f0]"
-        >
-          {SOURCE_OPTIONS.map((o) => (
-            <option key={o.value || "all-src"} value={o.value}>{o.label}</option>
-          ))}
-        </select>
+        </div>
+
+        <div className="w-px h-6 bg-[var(--border)]" />
+
+        {/* Region */}
+        <div className="relative inline-flex items-center">
+          <Globe className="absolute left-3 w-3.5 h-3.5 text-[var(--text-muted)] pointer-events-none" />
+          <select
+            value={region}
+            onChange={(e) => { setRegion(e.target.value); setLimit(50); }}
+            className="appearance-none pl-8 pr-8 py-1.5 rounded-xl bg-[var(--surface-elevated)] border border-[var(--border)] text-xs text-white focus:border-white/20"
+          >
+            {REGION_OPTIONS.map((o) => (
+              <option key={o.value || "all-rgn"} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="absolute right-2 w-3 h-3 text-[var(--text-muted)] pointer-events-none" />
+        </div>
+
+        {/* Source Repo */}
+        <div className="relative inline-flex items-center">
+          <SlidersHorizontal className="absolute left-3 w-3.5 h-3.5 text-[var(--text-muted)] pointer-events-none" />
+          <select
+            value={sourceRepo}
+            onChange={(e) => { setSourceRepo(e.target.value); setLimit(50); }}
+            className="appearance-none pl-8 pr-8 py-1.5 rounded-xl bg-[var(--surface-elevated)] border border-[var(--border)] text-xs text-white focus:border-white/20"
+          >
+            {SOURCE_OPTIONS.map((o) => (
+              <option key={o.value || "all-src"} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="absolute right-2 w-3 h-3 text-[var(--text-muted)] pointer-events-none" />
+        </div>
+
+        {/* Category */}
+        <div className="relative inline-flex items-center">
+          <Building2 className="absolute left-3 w-3.5 h-3.5 text-[var(--text-muted)] pointer-events-none" />
+          <select
+            value={category}
+            onChange={(e) => { setCategory(e.target.value); setLimit(50); }}
+            className="appearance-none pl-8 pr-8 py-1.5 rounded-xl bg-[var(--surface-elevated)] border border-[var(--border)] text-xs text-white focus:border-white/20"
+          >
+            {CATEGORY_OPTIONS.map((o) => (
+              <option key={o.value || "all-cat"} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="absolute right-2 w-3 h-3 text-[var(--text-muted)] pointer-events-none" />
+        </div>
+
+        <div className="w-px h-6 bg-[var(--border)]" />
+
+        {/* Sort */}
+        <div className="relative inline-flex items-center">
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value)}
+            className="appearance-none pl-3 pr-8 py-1.5 rounded-xl bg-[var(--surface-elevated)] border border-[var(--border)] text-xs text-white focus:border-white/20"
+          >
+            {SORT_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="absolute right-2 w-3 h-3 text-[var(--text-muted)] pointer-events-none" />
+        </div>
+
+        {hasFilters && (
+          <button
+            onClick={clearFilters}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs text-[var(--text-muted)] hover:text-white hover:bg-white/5 transition-colors"
+          >
+            <X className="w-3 h-3" />
+            Clear
+          </button>
+        )}
       </div>
 
-      {listingsQuery.isLoading && (
-        <p className="text-sm text-[#94a3b8]">Loading listings...</p>
-      )}
-      {listingsQuery.isError && (
-        <p className="text-sm text-red-400">Could not load job listings.</p>
+      {/* Results count */}
+      {!jobsQuery.isLoading && (
+        <p className="text-xs text-[var(--text-muted)] mb-4">
+          Showing {jobs.length} job{jobs.length !== 1 ? "s" : ""}
+        </p>
       )}
 
-      <ul className="flex flex-col gap-4">
-        {(listingsQuery.data ?? []).map((job) => (
-          <li key={job.id}>
-            <article className="card-zen rounded-2xl p-6 flex flex-col gap-3">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <h2 className="font-medium text-lg text-[#f8fafc] leading-snug">{job.title}</h2>
-                  {job.company_name && (
-                    <p className="mt-1 text-sm text-[#94a3b8]">{job.company_name}</p>
-                  )}
-                </div>
-                <a
-                  href={job.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex shrink-0 items-center gap-2 rounded-full bg-[#60a5fa]/15 px-4 py-2 text-sm font-medium text-[#93c5fd] hover:bg-[#60a5fa]/25"
-                >
-                  Apply
-                  <ExternalLink className="h-4 w-4" />
-                </a>
+      {/* Loading State */}
+      {jobsQuery.isLoading && (
+        <div className="space-y-3">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div
+              key={i}
+              className="card-zen rounded-2xl p-5 animate-pulse flex items-center gap-4"
+            >
+              <div className="flex-1 space-y-2">
+                <div className="h-4 bg-white/10 rounded w-2/3" />
+                <div className="h-3 bg-white/10 rounded w-1/3" />
               </div>
-              <div className="flex flex-wrap items-center gap-2 text-xs">
-                {job.location && (
-                  <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-white/[0.03] px-2 py-1 text-[#cbd5e1]">
-                    <MapPin className="h-3 w-3 text-[#64748b]" />
-                    {job.location}
-                  </span>
-                )}
-                {job.remote_ok === true && (
-                  <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-emerald-300/95">Remote</span>
-                )}
-                <span className="rounded-full border border-[var(--border)] bg-white/[0.03] px-2 py-1 text-[#cbd5e1]">
-                  {employmentLabel(job.employment_type)}
-                </span>
-                {job.source && (
-                  <span className="rounded-full border border-[var(--border)] bg-white/[0.03] px-2 py-1 text-[#94a3b8]">{job.source}</span>
-                )}
-                {job.posted_at && (
-                  <span className="text-[#64748b]">Posted {formatDate(job.posted_at)}</span>
-                )}
-              </div>
-              {job.description && (
-                <p className="text-sm text-[#94a3b8] line-clamp-3 leading-relaxed">{job.description}</p>
-              )}
-            </article>
-          </li>
-        ))}
-      </ul>
+              <div className="h-8 bg-white/10 rounded-full w-20" />
+            </div>
+          ))}
+        </div>
+      )}
 
-      {!listingsQuery.isLoading &&
-        !listingsQuery.isError &&
-        (listingsQuery.data?.length ?? 0) === 0 && (
-          <p className="text-sm text-[#64748b]">
-            No listings match your filters. Adjust search or filters.
-          </p>
+      {/* Error State */}
+      {jobsQuery.isError && (
+        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-5 py-4 text-sm text-red-300">
+          {(jobsQuery.error as Error)?.message || "Failed to load jobs"}
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!jobsQuery.isLoading &&
+        !jobsQuery.isError &&
+        jobs.length === 0 &&
+        countQuery.data?.total === 0 && (
+          <div className="card-zen rounded-2xl p-16 flex flex-col items-center justify-center text-center">
+            <Briefcase className="w-12 h-12 text-[var(--text-muted)] mb-4 opacity-50" />
+            <p className="text-[var(--text-muted)] text-sm max-w-sm mb-4">
+              No jobs scraped yet. Click &quot;Refresh Data&quot; to fetch listings
+              from GitHub.
+            </p>
+            <button
+              onClick={() => refreshMutation.mutate()}
+              disabled={refreshMutation.isPending}
+              className="inline-flex items-center gap-2 rounded-2xl bg-[#60a5fa]/10 border border-[#60a5fa]/20 px-5 py-2.5 text-sm font-medium text-[#93c5fd] hover:bg-[#60a5fa]/20 transition-all"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Fetch Jobs Now
+            </button>
+          </div>
         )}
 
-      {/* Deep Search Modal */}
-      {modalOpen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setModalOpen(false)} />
-          <div className="relative w-full max-w-lg mx-4 rounded-3xl border border-[var(--border)] bg-[#0e0e0f] p-8 shadow-2xl">
-            <button
-              onClick={() => setModalOpen(false)}
-              className="absolute top-4 right-4 text-[#64748b] hover:text-white transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-2xl bg-[#60a5fa]/10 flex items-center justify-center">
-                <Radar className="w-5 h-5 text-[#60a5fa]" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-white">Deep Search</h2>
-                <p className="text-xs text-[#64748b]">Find recently funded companies with AI</p>
-              </div>
-            </div>
-
-            {/* Company count */}
-            <div className="mb-5">
-              <label className="block text-xs font-medium text-[#94a3b8] mb-2">Companies to find</label>
-              <div className="flex gap-2">
-                {COMPANY_COUNTS.map((n) => (
-                  <button
-                    key={n}
-                    onClick={() => setDsParams((p) => ({ ...p, company_count: n }))}
-                    className={cn(
-                      "flex-1 py-2 rounded-xl border text-sm font-medium transition-all",
-                      dsParams.company_count === n
-                        ? "border-[#60a5fa]/40 bg-[#60a5fa]/10 text-[#93c5fd]"
-                        : "border-[var(--border)] bg-white/[0.02] text-[#94a3b8] hover:bg-white/5"
-                    )}
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Location */}
-            <div className="mb-5">
-              <label className="block text-xs font-medium text-[#94a3b8] mb-2">Location</label>
-              <div className="flex flex-wrap gap-2">
-                {[...LOCATIONS, "Custom" as const].map((loc) => (
-                  <button
-                    key={loc}
-                    onClick={() => setDsParams((p) => ({ ...p, location: loc }))}
-                    className={cn(
-                      "px-3 py-1.5 rounded-xl border text-xs font-medium transition-all",
-                      dsParams.location === loc
-                        ? "border-[#60a5fa]/40 bg-[#60a5fa]/10 text-[#93c5fd]"
-                        : "border-[var(--border)] bg-white/[0.02] text-[#94a3b8] hover:bg-white/5"
-                    )}
-                  >
-                    {loc}
-                  </button>
-                ))}
-              </div>
-              {dsParams.location === "Custom" && (
-                <input
-                  type="text"
-                  placeholder="e.g. Berlin, Tokyo, Lagos..."
-                  value={customLocation}
-                  onChange={(e) => setCustomLocation(e.target.value)}
-                  className="mt-2 w-full rounded-xl border border-[var(--border)] bg-white/[0.03] px-3 py-2 text-sm text-[#e2e8f0] placeholder:text-[#4b5563] focus:border-[#60a5fa]/40 focus:outline-none"
-                />
-              )}
-            </div>
-
-            {/* Recency */}
-            <div className="mb-5">
-              <label className="block text-xs font-medium text-[#94a3b8] mb-2">Recency</label>
-              <div className="flex flex-wrap gap-2">
-                {RECENCY_OPTIONS.map((o) => (
-                  <button
-                    key={o.value}
-                    onClick={() => setDsParams((p) => ({ ...p, recency: o.value }))}
-                    className={cn(
-                      "px-3 py-1.5 rounded-xl border text-xs font-medium transition-all",
-                      dsParams.recency === o.value
-                        ? "border-[#60a5fa]/40 bg-[#60a5fa]/10 text-[#93c5fd]"
-                        : "border-[var(--border)] bg-white/[0.02] text-[#94a3b8] hover:bg-white/5"
-                    )}
-                  >
-                    {o.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Sector */}
-            <div className="mb-6">
-              <label className="block text-xs font-medium text-[#94a3b8] mb-2">Sector (optional)</label>
-              <input
-                type="text"
-                placeholder="e.g. AI/ML, FinTech, HealthTech, Climate..."
-                value={dsParams.sector}
-                onChange={(e) => setDsParams((p) => ({ ...p, sector: e.target.value }))}
-                className="w-full rounded-xl border border-[var(--border)] bg-white/[0.03] px-3 py-2 text-sm text-[#e2e8f0] placeholder:text-[#4b5563] focus:border-[#60a5fa]/40 focus:outline-none"
-              />
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center justify-between">
-              <button
-                onClick={handleDefaults}
-                className="text-xs text-[#64748b] hover:text-[#94a3b8] transition-colors"
-              >
-                Reset to defaults
-              </button>
-              <button
-                onClick={handleStartSearch}
-                disabled={startSearch.isPending}
-                className={cn(
-                  "inline-flex items-center gap-2 rounded-2xl px-6 py-2.5 text-sm font-medium transition-all",
-                  startSearch.isPending
-                    ? "bg-[#60a5fa]/5 text-[#64748b] cursor-not-allowed"
-                    : "bg-[#60a5fa]/15 text-[#93c5fd] hover:bg-[#60a5fa]/25"
-                )}
-              >
-                {startSearch.isPending ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Starting...
-                  </>
-                ) : (
-                  <>
-                    <Radar className="w-4 h-4" />
-                    Start Search
-                  </>
-                )}
-              </button>
-            </div>
-
-            {startSearch.isError && (
-              <p className="mt-3 text-xs text-red-400">
-                {(startSearch.error as Error)?.message || "Failed to start search"}
-              </p>
-            )}
+      {/* No filter results */}
+      {!jobsQuery.isLoading &&
+        !jobsQuery.isError &&
+        jobs.length === 0 &&
+        (countQuery.data?.total ?? 0) > 0 && (
+          <div className="card-zen rounded-2xl p-12 flex flex-col items-center justify-center text-center">
+            <Search className="w-10 h-10 text-[var(--text-muted)] mb-3 opacity-50" />
+            <p className="text-[var(--text-muted)] text-sm">
+              No jobs match your filters. Try adjusting your search.
+            </p>
           </div>
-        </div>
+        )}
+
+      {/* Job Listings */}
+      {!jobsQuery.isLoading && jobs.length > 0 && (
+        <>
+          <div className="space-y-2">
+            {jobs.map((job) => (
+              <article
+                key={job.id}
+                className="card-zen rounded-2xl px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 group hover:border-white/10 transition-colors"
+              >
+                {/* Left: Job info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start gap-2 mb-1.5">
+                    <h2 className="font-medium text-sm text-white leading-snug truncate">
+                      {job.position}
+                    </h2>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                    {job.company_url ? (
+                      <a
+                        href={job.company_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#93c5fd] hover:text-[#bfdbfe] font-medium transition-colors"
+                      >
+                        {job.company}
+                      </a>
+                    ) : (
+                      <span className="text-[#94a3b8] font-medium">
+                        {job.company}
+                      </span>
+                    )}
+                    {job.location && (
+                      <span className="inline-flex items-center gap-1 text-[var(--text-muted)]">
+                        <MapPin className="w-3 h-3" />
+                        {job.location}
+                      </span>
+                    )}
+                    {job.salary && (
+                      <span className="inline-flex items-center gap-1 text-emerald-300">
+                        <DollarSign className="w-3 h-3" />
+                        {job.salary}
+                      </span>
+                    )}
+                    {job.posted_at && (
+                      <span className="inline-flex items-center gap-1 text-[var(--text-muted)]">
+                        <Clock className="w-3 h-3" />
+                        {timeSince(job.posted_at)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Right: Badges & Apply */}
+                <div className="flex items-center gap-2 shrink-0">
+                  <span
+                    className={cn(
+                      "text-[10px] font-medium px-2 py-0.5 rounded-full border",
+                      sourceRepoBadge(job.source_repo),
+                    )}
+                  >
+                    {job.source_repo === "ai" ? "AI/ML" : "SWE"}
+                  </span>
+                  <span
+                    className={cn(
+                      "text-[10px] font-medium px-2 py-0.5 rounded-full border",
+                      job.job_type === "internship"
+                        ? "border-blue-500/30 bg-blue-500/10 text-blue-300"
+                        : "border-purple-500/30 bg-purple-500/10 text-purple-300",
+                    )}
+                  >
+                    {job.job_type === "internship" ? "Intern" : "New Grad"}
+                  </span>
+                  {job.category && (
+                    <span
+                      className={cn(
+                        "text-[10px] font-medium px-2 py-0.5 rounded-full border",
+                        categoryBadgeStyle(job.category),
+                      )}
+                    >
+                      {job.category}
+                    </span>
+                  )}
+                  <a
+                    href={job.apply_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-[#60a5fa]/15 px-4 py-1.5 text-xs font-medium text-[#93c5fd] hover:bg-[#60a5fa]/25 transition-colors"
+                  >
+                    Apply
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          {/* Load More */}
+          {jobs.length >= limit && (
+            <div className="flex justify-center mt-6">
+              <button
+                onClick={loadMore}
+                className="inline-flex items-center gap-2 rounded-2xl border border-[var(--border)] bg-white/[0.03] px-6 py-2.5 text-sm font-medium text-[var(--text-muted)] hover:bg-white/5 hover:text-white transition-colors"
+              >
+                Load more
+                <ChevronDown className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

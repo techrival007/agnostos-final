@@ -1,8 +1,9 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Wind, Home, User, Building2, Radio, Search, BarChart3, ScrollText, Settings, Zap, Eye, ChevronDown } from "lucide-react";
+import { Wind, Home, User, Building2, Radio, Search, BarChart3, ScrollText, Settings, Zap, Eye, ChevronDown, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/stores/useAuthStore";
 
 type NavItem = { href: string; icon: typeof Home; label: string };
 type NavGroup = { icon: typeof Home; label: string; children: NavItem[] };
@@ -28,6 +29,7 @@ const NAV: NavEntry[] = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { logout } = useAuthStore();
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
@@ -36,6 +38,11 @@ export function Sidebar() {
 
   const isGroupActive = (group: NavGroup) =>
     group.children.some((c) => isActive(c.href));
+
+  const handleLogout = () => {
+    const shouldLogout = window.confirm("Are you sure you want to log out?");
+    if (shouldLogout) logout();
+  };
 
   return (
     <aside className="w-20 lg:w-64 border-r border-[var(--border)] h-screen sticky top-0 flex flex-col items-center lg:items-start py-8 px-3 lg:px-5 z-50 bg-[var(--background)] shrink-0">
@@ -100,7 +107,19 @@ export function Sidebar() {
         )}
       </nav>
 
-      <div className="w-full">
+      <div className="w-full space-y-1">
+        <div className="flex items-center gap-3 px-4 py-3 rounded-2xl text-[var(--text-muted)] border border-white/5 bg-white/[0.02]">
+          <Zap className="w-5 h-5 shrink-0 text-amber-400" />
+          <span className="hidden lg:block text-sm font-medium">100 tokens</span>
+        </div>
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-[var(--text-muted)] hover:text-red-300 hover:bg-red-500/10 transition-all"
+        >
+          <LogOut className="w-5 h-5 shrink-0" />
+          <span className="hidden lg:block text-sm font-medium">Log out</span>
+        </button>
         <Link href="/settings" className="flex items-center gap-3 px-4 py-3 rounded-2xl text-[var(--text-muted)] hover:text-white transition-all">
           <Settings className="w-5 h-5 shrink-0" />
           <span className="hidden lg:block text-sm font-medium">Settings</span>

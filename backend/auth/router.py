@@ -4,7 +4,7 @@ from sqlalchemy import select
 from database import get_db
 from shared.models import User
 from adam.models import UserProfile
-from auth.schemas import RegisterRequest, LoginRequest, AuthResponse, UserOut
+from auth.schemas import RegisterRequest, LoginRequest, AuthResponse, UserOut, UpdateMeRequest
 from auth.service import hash_password, verify_password, create_token, get_current_user
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -58,4 +58,29 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
 
 @router.get("/me", response_model=UserOut)
 async def get_me(user: User = Depends(get_current_user)):
+    return _user_out(user)
+
+
+@router.patch("/me", response_model=UserOut)
+async def update_me(
+    req: UpdateMeRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if req.email is not None:
+        email = req.email.strip().lower()
+        if not email:
+            raise HTTPException(status_code=400, detail="Email cannot be empty")
+        if email != user.email:
+            existing = await db.execute(select(User).where(User.email == email))
+            if existing.scalar_one_or_none():
+                raise HTTPException(status_code=400, detail="Email already in use")
+            user.email = email
+
+    if req.name is not None:
+        name = req.name.strip()
+        user.name = name or None
+
+    await db.commit()
+    await db.refresh(user)
     return _user_out(user)

@@ -27,3 +27,8 @@ class UserOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class UpdateMeRequest(BaseModel):
+    email: str | None = None
+    name: str | None = None

@@ -10,7 +10,6 @@ query_writer_instructions = """You are a startup and venture capital research sp
 Research Parameters:
 - Target count: {target_count} companies
 - Location focus: {location}
-- Recency window: {recency}
 - Sector focus: {sector}
 
 Instructions:
@@ -23,6 +22,7 @@ Instructions:
   5. VC portfolio updates: a16z, Sequoia, YC, Bessemer portfolio announcements
   6. Regional/sector databases: Inc42 (India), EU-Startups (Europe), sector-specific trackers
 - Queries MUST include the current date context. Current date: {current_date}
+- Focus on recently funded/recently added companies without strict year-wise filtering.
 - Prioritize queries that will return STRUCTURED data: company name, funding amount, round type, investors, location, sector.
 - If location is specified, include location-specific queries.
 - If sector is specified, include sector-specific queries.

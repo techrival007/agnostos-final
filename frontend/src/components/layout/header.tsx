@@ -1,8 +1,8 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, ChevronDown, Home, Folder, BookOpen, Zap, LogOut } from "lucide-react";
+import { Bell, Home, Folder, BookOpen, Settings } from "lucide-react";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useNotificationStore } from "@/stores/useNotificationStore";
 import { NotificationPanel } from "@/components/notifications/NotificationPanel";
@@ -18,8 +18,10 @@ const POLL_INTERVAL = 5000;
 
 export function Header() {
   const pathname = usePathname();
-  const { user, logout } = useAuthStore();
+  const { user } = useAuthStore();
   const { unreadCount, togglePanel, fetchUnreadCount } = useNotificationStore();
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
@@ -32,17 +34,24 @@ export function Header() {
     return () => clearInterval(id);
   }, [fetchUnreadCount]);
 
+  useEffect(() => {
+    if (!profileOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+        setProfileOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [profileOpen]);
+
   const initials = user?.name?.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() || "U";
 
   return (
     <header className="h-16 px-6 lg:px-8 flex items-center justify-between sticky top-0 bg-[var(--background)]/70 backdrop-blur-xl z-40 border-b border-[var(--border)]">
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-full border border-[var(--border)] cursor-pointer hover:bg-white/10 transition-all">
-          <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center text-[9px] text-emerald-400 font-bold border border-emerald-500/30">P</div>
-          <span className="text-xs font-medium text-neutral-300 hidden sm:block">Personal</span>
-          <ChevronDown className="w-3 h-3 text-[var(--text-muted)]" />
-        </div>
-      </div>
+      <div />
 
       <div className="absolute left-1/2 -translate-x-1/2 hidden md:flex items-center bg-black/40 border border-[var(--border)] rounded-full p-1">
         {CENTER_NAV.map(({ href, icon: Icon, label }) => (
@@ -73,16 +82,31 @@ export function Header() {
           </button>
           <NotificationPanel />
         </div>
-        <div className="w-8 h-8 rounded-full bg-[#1a1a1b] flex items-center justify-center font-medium text-[10px] border border-white/5 text-[var(--text-muted)] cursor-pointer hover:text-white transition-all">
-          {initials}
+        <div className="relative" ref={profileRef}>
+          <button
+            onClick={() => setProfileOpen((open) => !open)}
+            className="w-8 h-8 rounded-full bg-[#1a1a1b] flex items-center justify-center font-medium text-[10px] border border-white/5 text-[var(--text-muted)] cursor-pointer hover:text-white transition-all"
+            aria-label="Open profile menu"
+          >
+            {initials}
+          </button>
+          {profileOpen && (
+            <div className="absolute right-0 mt-2 w-64 rounded-2xl border border-[var(--border)] bg-[#0c0c0e]/95 shadow-xl backdrop-blur-xl p-2">
+              <div className="px-3 py-2 border-b border-white/5">
+                <p className="text-sm font-medium text-white truncate">{user?.name || "User"}</p>
+                <p className="text-xs text-[var(--text-muted)] truncate">{user?.email || "No email"}</p>
+              </div>
+              <Link
+                href="/settings"
+                onClick={() => setProfileOpen(false)}
+                className="mt-1 flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--text-muted)] hover:bg-white/5 hover:text-white transition-all"
+              >
+                <Settings className="w-4 h-4" />
+                Settings
+              </Link>
+            </div>
+          )}
         </div>
-        <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-white/5 rounded-full border border-white/5">
-          <Zap className="w-3 h-3 text-amber-400" />
-          <span className="text-[10px] font-semibold text-neutral-400">100</span>
-        </div>
-        <button onClick={logout} className="w-8 h-8 rounded-full flex items-center justify-center text-[var(--text-muted)] hover:text-red-400 transition-colors" title="Logout">
-          <LogOut className="w-4 h-4" />
-        </button>
       </div>
     </header>
   );
