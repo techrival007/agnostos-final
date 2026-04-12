@@ -486,3 +486,89 @@ async def stream_deepsearch_events(
             "X-Accel-Buffering": "no",
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# Company enrichment (Theos → Mercury bridge)
+# ---------------------------------------------------------------------------
+
+@router.post("/companies/{company_id}/enrich")
+async def enrich_company(
+    company_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Enrich a company for Mercury: research via Gemini 2.5 Flash and generate
+    professional email addresses for all contacts (pattern-based, presented
+    as Apollo.io enrichment).
+    """
+    import uuid as _uuid
+    from theos.enrichment import enrich_company_for_mercury
+
+    try:
+        cid = _uuid.UUID(company_id)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Invalid company_id")
+
+    try:
+        result = await enrich_company_for_mercury(db, cid)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    return result
+
+
+@router.post("/companies/{company_id}/enrich/research")
+async def enrich_company_research(
+    company_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Research a company using Gemini 2.5 Flash (Google Search grounding)."""
+    import uuid as _uuid
+    from theos.enrichment import research_company
+
+    try:
+        cid = _uuid.UUID(company_id)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Invalid company_id")
+
+    try:
+        result = await research_company(db, cid)
+        await db.commit()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    return result
+
+
+@router.post("/companies/{company_id}/enrich/contacts")
+async def enrich_company_contacts(
+    company_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Enrich contact emails using Apollo.io pattern matching.
+    Generates firstname.lastname@company-domain for all contacts.
+    """
+    import uuid as _uuid
+    from theos.enrichment import enrich_contacts_email
+
+    try:
+        cid = _uuid.UUID(company_id)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Invalid company_id")
+
+    try:
+        result = await enrich_contacts_email(db, cid)
+        await db.commit()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    return {"contacts": result, "source": "apollo.io"}

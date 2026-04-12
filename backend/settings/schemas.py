@@ -14,3 +14,7 @@ class ProviderSettingsResponse(BaseModel):
 
 class GeminiKeyUpdateRequest(BaseModel):
     gemini_api_key: str = Field(default="")
+
+
+class ApolloKeyUpdateRequest(BaseModel):
+    apollo_api_key: str = Field(default="")

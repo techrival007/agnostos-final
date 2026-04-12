@@ -120,6 +120,7 @@ export interface Contact {
   professional_email: string | null;
   personal_email: string | null;
   email_confidence_score: number | null;
+  email_source: string | null;
   is_new_recruit: boolean;
   tenure_months: number | null;
   is_founder: boolean;
@@ -229,6 +230,21 @@ export interface GithubJobsRefreshResult {
 export interface GithubJobsCount {
   total: number;
   last_scraped_at: string | null;
+}
+
+export interface ContactEmailStatus {
+  contact_id: string;
+  email_id: string | null;
+  campaign_id: string | null;
+  status: string;
+  subject: string | null;
+  body: string | null;
+  subject_options: string[] | null;
+  relevance_score: number | null;
+  hook_used: string | null;
+  sent_at: string | null;
+  opened_at: string | null;
+  replied_at: string | null;
 }
 
 export interface PipelineColumn {

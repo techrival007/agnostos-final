@@ -128,10 +128,36 @@ async def create_campaign_with_drafts(
     )
     research = research_result.scalar_one_or_none()
 
+    # Auto-enrich: if no research exists, use Gemini to research the company;
+    # if contacts lack emails, generate them (Theos → Mercury bridge).
+    if not research or not company.research_summary:
+        try:
+            from theos.enrichment import research_company
+            await research_company(db, company_id)
+            research_result = await db.execute(
+                select(CompanyResearch).where(CompanyResearch.company_id == company_id)
+            )
+            research = research_result.scalar_one_or_none()
+            await db.refresh(company)
+        except Exception:
+            pass
+
     contacts_result = await db.execute(
         select(Contact).where(Contact.company_id == company_id)
     )
     contacts = contacts_result.scalars().all()
+
+    has_emails = any(c.professional_email or c.personal_email for c in contacts)
+    if not has_emails and contacts:
+        try:
+            from theos.enrichment import enrich_contacts_email
+            await enrich_contacts_email(db, company_id)
+            contacts_result = await db.execute(
+                select(Contact).where(Contact.company_id == company_id)
+            )
+            contacts = contacts_result.scalars().all()
+        except Exception:
+            pass
 
     reachable = [c for c in contacts if c.professional_email or c.personal_email]
 

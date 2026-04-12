@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     linkedin_password: str = ""
     backend_cors_origins: list[str] = ["http://localhost:3000"]
 
+    # Apollo — contact enrichment (email lookup)
+    apollo_api_key: str = ""
+
     # Nylas — Gmail / Outlook OAuth + sending
     nylas_api_key: str = ""
     nylas_client_id: str = ""

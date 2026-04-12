@@ -46,6 +46,7 @@ class ContactOut(BaseModel):
     professional_email: str | None = None
     personal_email: str | None = None
     email_confidence_score: float | None = None
+    email_source: str | None = None
     is_new_recruit: bool = False
     tenure_months: int | None = None
     is_founder: bool = False

@@ -9,6 +9,7 @@ from theos.models import Company, Contact
 from mercury.schemas import (
     CampaignCreate, CampaignOut, CampaignDetailOut, EmailOut, EmailUpdate,
     FollowupOut, PipelineColumn, PipelineCard,
+    ContactEmailStatus, SingleContactDraftRequest,
 )
 from theos.schemas import CompanyOut
 from auth.service import get_current_user
@@ -182,6 +183,145 @@ async def create_campaign(
         )
 
     return CampaignDetailOut(campaign=campaign_out, emails=emails_out, company=company_out)
+
+
+@router.get("/status/company/{company_id}", response_model=list[ContactEmailStatus])
+async def get_contact_email_statuses(
+    company_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Return Mercury email status for every contact at a company.
+    Allows the company detail page to show per-contact outreach state.
+    """
+    campaign_result = await db.execute(
+        select(Campaign).where(
+            Campaign.user_id == user.id,
+            Campaign.company_id == company_id,
+        )
+    )
+    campaign = campaign_result.scalar_one_or_none()
+
+    contacts_result = await db.execute(
+        select(Contact.id).where(Contact.company_id == company_id)
+    )
+    contact_ids = [cid for (cid,) in contacts_result.all()]
+
+    if not campaign or not contact_ids:
+        return [ContactEmailStatus(contact_id=str(cid)) for cid in contact_ids]
+
+    emails_result = await db.execute(
+        select(OutreachEmail).where(
+            OutreachEmail.campaign_id == campaign.id,
+            OutreachEmail.contact_id.in_(contact_ids),
+            OutreachEmail.followup_number == 0,
+        )
+    )
+    emails_by_contact = {str(e.contact_id): e for e in emails_result.scalars().all()}
+
+    out: list[ContactEmailStatus] = []
+    for cid in contact_ids:
+        e = emails_by_contact.get(str(cid))
+        if e:
+            out.append(ContactEmailStatus(
+                contact_id=str(cid),
+                email_id=str(e.id),
+                campaign_id=str(e.campaign_id),
+                status=e.status,
+                subject=e.subject,
+                body=e.body,
+                subject_options=e.subject_options,
+                relevance_score=e.relevance_score,
+                hook_used=e.hook_used,
+                sent_at=e.sent_at,
+                opened_at=e.opened_at,
+                replied_at=e.replied_at,
+            ))
+        else:
+            out.append(ContactEmailStatus(contact_id=str(cid)))
+    return out
+
+
+@router.post("/draft/contact", response_model=ContactEmailStatus, status_code=201)
+async def generate_draft_for_contact(
+    body: SingleContactDraftRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Generate a Mercury draft email for a single contact.
+    Creates the campaign for the company if one doesn't exist yet.
+    """
+    import uuid as _uuid
+    from mercury.service import _get_or_create_campaign, _generate_email_for_contact
+    from adam.models import UserProfile
+    from theos.models import CompanyResearch
+
+    try:
+        company_uuid = _uuid.UUID(body.company_id)
+        contact_uuid = _uuid.UUID(body.contact_id)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Invalid UUID")
+
+    profile_result = await db.execute(
+        select(UserProfile).where(UserProfile.user_id == user.id)
+    )
+    profile = profile_result.scalar_one_or_none()
+    if not profile:
+        raise HTTPException(status_code=400, detail="Complete onboarding first.")
+
+    company = await db.get(Company, company_uuid)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+
+    contact = await db.get(Contact, contact_uuid)
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contact not found")
+
+    if not contact.professional_email and not contact.personal_email:
+        raise HTTPException(status_code=400, detail="Contact has no email — enrich first")
+
+    research_result = await db.execute(
+        select(CompanyResearch).where(CompanyResearch.company_id == company_uuid)
+    )
+    research = research_result.scalar_one_or_none()
+
+    campaign, _ = await _get_or_create_campaign(db, user.id, company_uuid, body.tone_settings)
+
+    email = await _generate_email_for_contact(
+        db, user, profile, campaign, contact, company, research
+    )
+
+    if not email:
+        existing = await db.execute(
+            select(OutreachEmail).where(
+                OutreachEmail.campaign_id == campaign.id,
+                OutreachEmail.contact_id == contact_uuid,
+                OutreachEmail.followup_number == 0,
+            )
+        )
+        email = existing.scalar_one_or_none()
+
+    await db.commit()
+
+    if not email:
+        raise HTTPException(status_code=500, detail="Could not generate draft")
+
+    return ContactEmailStatus(
+        contact_id=str(contact.id),
+        email_id=str(email.id),
+        campaign_id=str(email.campaign_id),
+        status=email.status,
+        subject=email.subject,
+        body=email.body,
+        subject_options=email.subject_options,
+        relevance_score=email.relevance_score,
+        hook_used=email.hook_used,
+        sent_at=email.sent_at,
+        opened_at=email.opened_at,
+        replied_at=email.replied_at,
+    )
 
 
 @router.post("/emails/{email_id}/approve")

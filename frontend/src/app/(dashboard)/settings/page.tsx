@@ -10,9 +10,12 @@ export default function SettingsPage() {
   const [name, setName] = useState(user?.name ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
   const [geminiKey, setGeminiKey] = useState("");
+  const [apolloKey, setApolloKey] = useState("");
   const [showGeminiEditor, setShowGeminiEditor] = useState(false);
+  const [showApolloEditor, setShowApolloEditor] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingGemini, setSavingGemini] = useState(false);
+  const [savingApollo, setSavingApollo] = useState(false);
   const [status, setStatus] = useState<{ kind: "success" | "error"; message: string } | null>(null);
   const [providers, setProviders] = useState<ProviderSettingsResponse["providers"]>([]);
 
@@ -43,8 +46,13 @@ export default function SettingsPage() {
     [providers],
   );
 
+  const apolloProvider = useMemo(
+    () => providers.find((provider) => provider.id === "apollo"),
+    [providers],
+  );
+
   const otherProviders = useMemo(
-    () => providers.filter((provider) => provider.id !== "gemini"),
+    () => providers.filter((provider) => provider.id !== "gemini" && provider.id !== "apollo"),
     [providers],
   );
 
@@ -90,6 +98,28 @@ export default function SettingsPage() {
       });
     } finally {
       setSavingGemini(false);
+    }
+  };
+
+  const saveApollo = async () => {
+    setSavingApollo(true);
+    setStatus(null);
+    try {
+      const data = await apiFetch<ProviderSettingsResponse>("/api/settings/providers/apollo", {
+        method: "PUT",
+        body: JSON.stringify({ apollo_api_key: apolloKey }),
+      });
+      setProviders(data.providers);
+      setApolloKey("");
+      setShowApolloEditor(false);
+      setStatus({ kind: "success", message: "Apollo API key saved. Contact enrichment is now active." });
+    } catch (error) {
+      setStatus({
+        kind: "error",
+        message: error instanceof Error ? error.message : "Could not save Apollo API key.",
+      });
+    } finally {
+      setSavingApollo(false);
     }
   };
 
@@ -190,6 +220,47 @@ export default function SettingsPage() {
                   </button>
                   <button
                     onClick={() => setShowGeminiEditor(false)}
+                    className="px-3 py-2 rounded-lg border border-[var(--border)] text-sm text-[var(--text-muted)] hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setShowApolloEditor((open) => !open)}
+              className="w-full flex items-center justify-between px-4 py-3 bg-white/[0.02] rounded-xl border border-[var(--border)] hover:bg-white/[0.04] transition-all text-left"
+            >
+              <span className="text-sm text-neutral-300">Apollo.io API Key</span>
+              <span className="text-xs text-neutral-500">
+                {apolloProvider?.configured ? "Configured" : "Not configured"}
+              </span>
+            </button>
+            {showApolloEditor && (
+              <div className="px-4 py-4 bg-white/[0.02] rounded-xl border border-[var(--border)]">
+                <label className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Apollo key</label>
+                <input
+                  value={apolloKey}
+                  onChange={(event) => setApolloKey(event.target.value)}
+                  className="mt-2 h-10 w-full rounded-xl border border-[var(--border)] bg-black/20 px-3 text-sm outline-none focus:border-white/20"
+                  type="password"
+                  placeholder="apollo_..."
+                />
+                <p className="text-xs text-[var(--text-muted)] mt-2">
+                  Used for contact email enrichment. Get your key from Apollo.io dashboard.
+                </p>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={saveApollo}
+                    disabled={savingApollo}
+                    className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-sm disabled:opacity-60"
+                  >
+                    {savingApollo ? "Saving..." : "Save key"}
+                  </button>
+                  <button
+                    onClick={() => setShowApolloEditor(false)}
                     className="px-3 py-2 rounded-lg border border-[var(--border)] text-sm text-[var(--text-muted)] hover:text-white"
                   >
                     Cancel

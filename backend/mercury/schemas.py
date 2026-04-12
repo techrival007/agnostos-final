@@ -83,6 +83,30 @@ class PipelineColumn(BaseModel):
     cards: list["PipelineCard"] = []
 
 
+class ContactEmailStatus(BaseModel):
+    contact_id: str
+    email_id: str | None = None
+    campaign_id: str | None = None
+    status: str = "none"
+    subject: str | None = None
+    body: str | None = None
+    subject_options: list[str] | None = None
+    relevance_score: float | None = None
+    hook_used: str | None = None
+    sent_at: datetime | None = None
+    opened_at: datetime | None = None
+    replied_at: datetime | None = None
+
+    class Config:
+        from_attributes = True
+
+
+class SingleContactDraftRequest(BaseModel):
+    company_id: str
+    contact_id: str
+    tone_settings: dict | None = None
+
+
 class PipelineCard(BaseModel):
     email_id: str
     campaign_id: str
