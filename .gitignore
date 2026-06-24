@@ -30,6 +30,7 @@ Thumbs.db
 
 # Analysis output
 analysis/
+graphify-out/
 
 # Logs
 *.log

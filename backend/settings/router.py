@@ -27,7 +27,11 @@ def _build_provider_list() -> list[ProviderStatus]:
         ),
         ProviderStatus(id="anthropic", label="Anthropic", configured=False),
         ProviderStatus(id="grok", label="Grok", configured=False),
-        ProviderStatus(id="openai", label="OpenAI", configured=False),
+        ProviderStatus(
+            id="openai",
+            label="OpenAI",
+            configured=bool(settings.openai_api_key.strip()),
+        ),
     ]
 
 

@@ -33,10 +33,16 @@ if "?" in resolved_url:
 else:
     resolved_url += "?prepared_statement_cache_size=0"
 
+_parsed = urlparse(resolved_url)
+_use_ssl = _parsed.hostname not in ("localhost", "127.0.0.1")
+_connect_args: dict = {"statement_cache_size": 0}
+if _use_ssl:
+    _connect_args["ssl"] = ssl_context
+
 engine = create_async_engine(
     resolved_url,
     echo=False,
-    connect_args={"ssl": ssl_context, "statement_cache_size": 0},
+    connect_args=_connect_args,
     pool_size=5,
     max_overflow=10,
     pool_pre_ping=True,

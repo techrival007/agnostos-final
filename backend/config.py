@@ -6,11 +6,17 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_anon_key: str = ""
     supabase_service_role_key: str = ""
+    postgres_host: str = "localhost"
+    postgres_port: int = 5432
+    postgres_user: str = "postgres"
+    postgres_password: str = ""
+    postgres_db: str = "agnostos"
     database_url: str = "postgresql+asyncpg://postgres.your-project-ref:your-db-password@aws-0-region.pooler.supabase.com:6543/postgres"
     jwt_secret: str = "agnostos-dev-secret-change-in-production"
     jwt_algorithm: str = "HS256"
     jwt_expiration_hours: int = 72
     gemini_api_key: str = ""
+    openai_api_key: str = ""
     deepgram_api_key: str = ""
     linkedin_email: str = ""
     linkedin_password: str = ""

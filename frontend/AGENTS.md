@@ -1,3 +1,7 @@
+## Design system
+
+All UI work must follow **`../DESIGN.MD`**. It defines colors, typography, spacing, shells (dashboard/auth/onboarding), components, badges, agent identity, and motion. Update that file when you add new global visual patterns.
+
 <!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know
 

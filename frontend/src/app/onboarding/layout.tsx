@@ -19,7 +19,13 @@ export default function OnboardingLayout({ children }: { children: React.ReactNo
     if (!loading && !user) router.push("/auth");
   }, [user, loading, router]);
 
-  if (loading || !user) return null;
+  if (loading || !user) {
+    return (
+      <div className="min-h-screen bg-zen-gradient flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-[var(--primary)] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   const currentStepIndex = STEPS.findIndex((s) => pathname.startsWith(s.path));
 

@@ -16,15 +16,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (!loading && user && !user.onboarding_completed) router.push("/onboarding/resume");
   }, [user, loading, router]);
 
-  if (loading) {
+  if (loading || !user || !user.onboarding_completed) {
     return (
       <div className="min-h-screen bg-zen-gradient flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-[var(--primary)] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
-
-  if (!user || !user.onboarding_completed) return null;
 
   return (
     <div className="min-h-screen bg-zen-gradient flex">

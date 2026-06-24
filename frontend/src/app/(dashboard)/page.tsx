@@ -9,6 +9,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { useAuthStore } from "@/stores/useAuthStore";
 import type { Campaign, Company } from "@/types";
 import {
   cn,
@@ -27,18 +28,22 @@ function formatStage(stage: string | null): string {
 }
 
 export default function DashboardHomePage() {
+  const authReady = useAuthStore((s) => !s.loading && !!s.token);
+
   const companiesQuery = useQuery({
     queryKey: ["theos", "companies", "dashboard", 5],
     queryFn: () =>
       apiFetch<Company[]>(
         "/api/theos/companies?limit=5&sort=hiring_score",
       ),
+    enabled: authReady,
   });
 
   const campaignsQuery = useQuery({
     queryKey: ["mercury", "campaigns", "dashboard", 3],
     queryFn: () =>
       apiFetch<Campaign[]>("/api/mercury/campaigns?limit=3"),
+    enabled: authReady,
   });
 
   const companies = companiesQuery.data ?? [];

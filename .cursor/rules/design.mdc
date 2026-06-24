@@ -1,0 +1,17 @@
+---
+description: Agnostos UI design system — read before any frontend visual work
+globs:
+  - frontend/**/*
+alwaysApply: false
+---
+
+# Design System
+
+Before creating or modifying frontend UI, read **`DESIGN.MD`** at the repository root.
+
+Rules:
+- Follow color tokens, typography, spacing, and component patterns defined there
+- Use CSS variables from `frontend/src/app/globals.css` — do not invent new hex colors
+- Use `card-zen`, `stagger-reveal`, `bg-zen-gradient`, and semantic helpers in `frontend/src/lib/utils.ts`
+- Icons: Lucide React only, at sizes documented in DESIGN.MD
+- When you introduce a new reusable visual pattern, update `DESIGN.MD` in the same change

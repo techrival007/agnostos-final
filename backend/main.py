@@ -30,18 +30,22 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with engine.begin() as conn:
-        try:
-            await conn.execute(text("SELECT 1"))
-            print("[startup] Database connection verified")
-        except Exception as e:
-            print(f"[startup] Database connection failed: {e}")
-        try:
+    async with engine.connect() as conn:
+        await conn.execute(text("SELECT 1"))
+        print("[startup] Database connection verified")
+
+    # Extension DDL in its own transaction — a failure must not abort create_all
+    try:
+        async with engine.begin() as conn:
             await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-            print("[startup] pgvector extension enabled")
-        except Exception:
-            print("[startup] pgvector extension already exists or cannot be created")
+        print("[startup] pgvector extension enabled")
+    except Exception as e:
+        print(f"[startup] pgvector extension skipped ({e})")
+
+    async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    print("[startup] Schema ready")
+
     yield
     await engine.dispose()
 

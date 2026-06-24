@@ -47,7 +47,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
         dehydrateOptions: {
           shouldDehydrateQuery: (query) => {
             const key = query.queryKey[0];
-            return typeof key === "string" && !["auth"].includes(key);
+            if (typeof key !== "string" || key === "auth") return false;
+            return query.state.status === "success";
           },
         },
       }}

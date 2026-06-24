@@ -45,13 +45,10 @@ interface AuthState {
   loadUser: () => Promise<void>;
 }
 
-const cachedUser = readCachedUser();
-const cachedToken = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY_TOKEN) : null;
-
 export const useAuthStore = create<AuthState>((set) => ({
-  user: cachedToken ? cachedUser : null,
-  token: cachedToken,
-  loading: cachedToken ? !cachedUser : false,
+  user: null,
+  token: null,
+  loading: true,
 
   login: async (email, password) => {
     const res = await apiFetch<{ token: string; user: User }>("/api/auth/login", {
